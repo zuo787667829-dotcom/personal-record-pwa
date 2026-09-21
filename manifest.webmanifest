@@ -1,0 +1,19 @@
+{
+  "name": "拾记｜个人记录",
+  "short_name": "拾记",
+  "description": "快速记录并找回私人想法、问题和反思。",
+  "lang": "zh-CN",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#20242b",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

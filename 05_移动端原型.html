@@ -1,0 +1,647 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="description" content="个人记录 App 的五页面低保真可点击原型">
+  <meta name="theme-color" content="#20242b">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="拾记">
+  <link rel="manifest" href="manifest.webmanifest">
+  <title>拾记｜个人记录 PWA</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23212936'/%3E%3Cpath d='M18 18h28v6H18zm0 11h28v6H18zm0 11h18v6H18z' fill='white'/%3E%3C/svg%3E">
+  <style>
+    :root {
+      --ink: #20242b;
+      --muted: #69707c;
+      --line: #d8dce2;
+      --soft: #f4f5f7;
+      --paper: #ffffff;
+      --accent: #263d64;
+      --accent-soft: #edf2fa;
+      --danger: #a23a3a;
+      --radius: 12px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      color: var(--ink);
+      background: #e9ebee;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; font-size: 16px; line-height: 1.5; }
+    button, input, select, textarea { font: inherit; color: inherit; }
+    button { cursor: pointer; }
+    button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus-visible {
+      outline: 3px solid rgba(38, 61, 100, .28); outline-offset: 2px;
+    }
+    .prototype-shell {
+      width: min(100%, 430px); min-height: 100vh; margin: 0 auto; background: var(--paper);
+      position: relative; overflow: hidden;
+    }
+    .screen { display: none; min-height: 100vh; padding-bottom: 88px; background: var(--paper); }
+    .screen.active { display: block; }
+    .topbar {
+      position: sticky; top: 0; z-index: 10; min-height: 60px; padding: 10px 16px;
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      border-bottom: 1px solid var(--line); background: rgba(255,255,255,.96);
+    }
+    .topbar h1 { margin: 0; font-size: 1.2rem; letter-spacing: .02em; }
+    .topbar .eyebrow { margin: 0; font-size: .78rem; color: var(--muted); }
+    .back { border: 0; background: transparent; min-width: 44px; min-height: 44px; font-size: 1.25rem; }
+    main, .content { padding: 18px 16px 26px; }
+    h2 { margin: 0 0 12px; font-size: 1.05rem; }
+    p { margin: 0; }
+    .muted { color: var(--muted); }
+    .tiny { font-size: .78rem; color: var(--muted); }
+    .section { margin-top: 24px; }
+    .section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+    .section-head h2 { margin: 0; }
+    .card {
+      border: 1px solid var(--line); border-radius: var(--radius); background: var(--paper); padding: 14px;
+    }
+    .card + .card { margin-top: 10px; }
+    .record-card { width: 100%; text-align: left; }
+    button.record-card { appearance: none; }
+    .record-card .meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+    .record-card .summary { margin-top: 6px; line-height: 1.55; }
+    .quick-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .quick-action {
+      min-height: 122px; padding: 16px; border: 1.5px solid var(--ink); border-radius: 16px;
+      background: var(--paper); text-align: left; display: flex; flex-direction: column; justify-content: space-between;
+    }
+    .quick-action.primary { background: var(--ink); color: white; }
+    .quick-action .icon { font-size: 1.7rem; }
+    .quick-action strong { font-size: 1.05rem; }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+    .chip {
+      min-height: 36px; padding: 6px 11px; border: 1px solid var(--line); border-radius: 999px;
+      background: var(--paper); font-size: .88rem;
+    }
+    .chip.selected, .chip[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+    .tag { display: inline-flex; padding: 3px 8px; border-radius: 999px; background: var(--soft); font-size: .76rem; color: #4b5260; }
+    .category { background: var(--accent-soft); color: var(--accent); }
+    .bottom-nav {
+      position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); z-index: 20;
+      width: min(100%, 430px); padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
+      display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--line); background: rgba(255,255,255,.98);
+    }
+    .nav-btn { min-height: 52px; border: 0; background: transparent; color: var(--muted); font-size: .82rem; }
+    .nav-btn span { display: block; font-size: 1.15rem; line-height: 1.1; }
+    .nav-btn.active { color: var(--accent); font-weight: 700; }
+    .mode-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border-radius: 12px; background: var(--soft); }
+    .mode-tab { min-height: 44px; border: 0; border-radius: 9px; background: transparent; }
+    .mode-tab.active { background: white; box-shadow: 0 1px 5px rgba(0,0,0,.08); font-weight: 700; }
+    label { display: block; margin-bottom: 7px; font-size: .9rem; font-weight: 650; }
+    input, select, textarea {
+      width: 100%; min-height: 46px; padding: 11px 12px; border: 1px solid #b9bec7; border-radius: 10px; background: white;
+    }
+    textarea { resize: vertical; min-height: 132px; line-height: 1.55; }
+    .field { margin-top: 16px; }
+    .input-note { margin-top: 6px; font-size: .78rem; color: var(--muted); }
+    .voice-panel { display: none; padding: 26px 12px 12px; text-align: center; }
+    .voice-panel.active { display: block; }
+    .text-panel.hidden { display: none; }
+    .voice-button {
+      width: 112px; height: 112px; border-radius: 50%; border: 2px solid var(--ink); background: white;
+      font-weight: 700; box-shadow: 0 0 0 8px var(--soft);
+    }
+    .voice-button.recording { background: var(--ink); color: white; animation: pulse 1.3s infinite; }
+    @keyframes pulse { 50% { box-shadow: 0 0 0 14px #e3e5e9; } }
+    .voice-status { min-height: 48px; margin-top: 18px; }
+    details.options { margin-top: 18px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+    details.options summary { min-height: 50px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; font-weight: 700; }
+    details.options summary::after { content: "+"; font-size: 1.25rem; }
+    details.options[open] summary::after { content: "−"; }
+    details.options summary::-webkit-details-marker { display: none; }
+    .sticky-action {
+      position: sticky; bottom: 74px; padding: 12px 16px; border-top: 1px solid var(--line); background: rgba(255,255,255,.97);
+      display: grid; grid-template-columns: 1fr; gap: 8px;
+    }
+    .btn { min-height: 48px; border: 1px solid var(--ink); border-radius: 11px; padding: 10px 15px; background: white; font-weight: 700; }
+    .btn.primary { background: var(--ink); color: white; }
+    .btn.secondary { border-color: var(--line); }
+    .btn:disabled { opacity: .42; cursor: not-allowed; }
+    .detail-block { margin-top: 16px; }
+    .detail-block h2 { display: flex; justify-content: space-between; align-items: center; }
+    .raw-box { padding: 14px; border-left: 4px solid var(--ink); background: var(--soft); white-space: pre-wrap; }
+    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .info-cell { padding: 10px; border: 1px solid var(--line); border-radius: 10px; }
+    .info-cell span { display: block; font-size: .76rem; color: var(--muted); }
+    .structure-fields { display: grid; gap: 14px; padding-bottom: 14px; }
+    .check-row { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px; }
+    .tri-select { width: auto; min-width: 112px; }
+    .filter-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .filter-row + .filter-row { margin-top: 8px; }
+    .date-heading { margin: 22px 0 8px; font-size: .9rem; color: var(--muted); font-weight: 700; }
+    .empty { padding: 34px 18px; text-align: center; color: var(--muted); border: 1px dashed var(--line); border-radius: var(--radius); }
+    .search-box { position: relative; }
+    .search-box input { padding-right: 52px; }
+    .search-box button { position: absolute; right: 4px; top: 4px; width: 40px; height: 38px; border: 0; background: transparent; }
+    .search-hint { margin: 12px 0 14px; padding: 11px 12px; border-radius: 10px; background: var(--accent-soft); font-size: .86rem; }
+    .result-count { margin: 18px 0 8px; font-size: .88rem; color: var(--muted); }
+    dialog { width: min(calc(100% - 32px), 390px); border: 0; border-radius: 16px; padding: 0; box-shadow: 0 20px 70px rgba(0,0,0,.25); }
+    dialog::backdrop { background: rgba(19,24,32,.45); }
+    .dialog-body { padding: 22px; }
+    .dialog-body h2 { font-size: 1.15rem; }
+    .dialog-actions { display: grid; gap: 9px; margin-top: 18px; }
+    .prototype-note { padding: 9px 14px; background: #fff8dc; border-bottom: 1px solid #eadca7; font-size: .76rem; color: #62582f; }
+    .status-local { background: #fff3cd; color: #6b5715; }
+    .status-ready { background: #eaf4ee; color: #285a3a; }
+    .top-actions { display: flex; align-items: center; gap: 6px; }
+    .danger { border-color: #d6a2a2 !important; color: var(--danger); }
+    .inline-create { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+    .dialog-list { max-height: 52vh; overflow: auto; margin-top: 14px; }
+    .dialog-row { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }
+    .button-row { display: flex; flex-wrap: wrap; gap: 8px; }
+    .sync-pill { border: 0; border-radius: 999px; padding: 5px 9px; font-size: .75rem; background: var(--soft); color: var(--muted); }
+    .toast {
+      position: fixed; z-index: 50; bottom: 88px; left: 50%; transform: translate(-50%, 16px); width: min(calc(100% - 32px), 390px);
+      padding: 12px 14px; border-radius: 10px; background: var(--ink); color: white; opacity: 0; pointer-events: none; transition: .2s;
+    }
+    .toast.show { opacity: 1; transform: translate(-50%, 0); }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+    @media (min-width: 700px) {
+      body { padding: 24px 0; }
+      .prototype-shell { min-height: calc(100vh - 48px); border: 1px solid #c8ccd3; border-radius: 28px; box-shadow: 0 18px 60px rgba(32,36,43,.15); }
+      .screen { min-height: calc(100vh - 48px); }
+      .bottom-nav { bottom: 24px; border-radius: 0 0 28px 28px; }
+    }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+  </style>
+</head>
+<body>
+  <div class="prototype-shell">
+    <div class="prototype-note status-local" id="app-status">正在准备离线数据…</div>
+
+    <section class="screen active" id="screen-home" data-screen="home" aria-labelledby="home-title">
+      <header class="topbar">
+        <div><p class="eyebrow" id="home-date"></p><h1 id="home-title">拾记</h1></div>
+        <button class="back" type="button" aria-label="打开搜索" data-go="search">⌕</button>
+      </header>
+      <main>
+        <h2>现在想记什么？</h2>
+        <div class="quick-grid">
+          <button class="quick-action primary" type="button" id="home-text-entry">
+            <span class="icon" aria-hidden="true">✎</span><strong>快速记录</strong><span>直接输入文字</span>
+          </button>
+          <button class="quick-action" type="button" id="home-voice-entry">
+            <span class="icon" aria-hidden="true">●</span><strong>语音记录</strong><span>点击后立即开始</span>
+          </button>
+        </div>
+
+        <section class="section" aria-labelledby="recent-categories-title">
+          <div class="section-head"><h2 id="recent-categories-title">最近使用分类</h2></div>
+          <div class="chips" id="recent-categories"></div>
+        </section>
+
+        <section class="section" aria-labelledby="today-title">
+          <div class="section-head"><h2 id="today-title">今天的记录</h2><button class="chip" type="button" data-go="timeline">查看全部</button></div>
+          <div id="home-records"></div>
+        </section>
+      </main>
+    </section>
+
+    <section class="screen" id="screen-capture" data-screen="capture" aria-labelledby="capture-title">
+      <header class="topbar">
+        <button class="back" type="button" data-go="home" aria-label="返回首页">‹</button>
+        <h1 id="capture-title">快速记录</h1>
+        <span class="tiny">只需正文</span>
+      </header>
+      <div class="content">
+        <div class="mode-tabs" role="tablist" aria-label="输入方式">
+          <button class="mode-tab active" id="text-mode" role="tab" aria-selected="true" type="button">文字</button>
+          <button class="mode-tab" id="voice-mode" role="tab" aria-selected="false" type="button">语音</button>
+        </div>
+
+        <div class="text-panel" id="text-panel">
+          <div class="field">
+            <label for="raw-text">原始记录</label>
+            <textarea id="raw-text" placeholder="先把想到的写下来……" maxlength="4000"></textarea>
+            <p class="input-note"><span id="char-count">0</span> 字 · 保存后原文不会被整理内容覆盖</p>
+          </div>
+        </div>
+
+        <div class="voice-panel" id="voice-panel">
+          <button class="voice-button" id="voice-record" type="button" aria-pressed="false">开始录音</button>
+          <div class="voice-status" id="voice-status"><strong>准备录音</strong><br><span class="tiny">本原型用示例文本模拟转写</span></div>
+          <div class="field" id="transcript-wrap" hidden>
+            <label for="voice-transcript">原始转写文本（自动转写或手动填写）</label>
+            <textarea id="voice-transcript" maxlength="4000"></textarea>
+            <p class="input-note">保存后保留这份原始转写；整理请在详情页进行。</p>
+          </div>
+        </div>
+
+        <details class="options" id="capture-options">
+          <summary>可选信息 <span class="tiny">不填也能保存</span></summary>
+          <div class="field">
+            <label>一级分类</label>
+            <div class="chips" id="capture-categories"></div>
+          </div>
+          <div class="field">
+            <label>标签（可多选）</label>
+            <div class="chips" id="capture-tags"></div>
+            <div class="inline-create" style="margin-top:10px">
+              <input id="new-tag-name" placeholder="新建标签" maxlength="30">
+              <button class="btn secondary" id="create-tag" type="button">添加</button>
+            </div>
+            <button class="chip" id="manage-tags" type="button" style="margin-top:8px">管理标签</button>
+          </div>
+          <div class="field">
+            <label for="capture-project">项目 / 主题</label>
+            <select id="capture-project"><option value="">不选择项目</option></select>
+            <div class="inline-create" style="margin-top:10px">
+              <input id="new-project-name" placeholder="新建项目 / 主题" maxlength="60">
+              <button class="btn secondary" id="create-project" type="button">添加</button>
+            </div>
+          </div>
+          <div class="field">
+            <label for="capture-time">发生时间</label>
+            <input id="capture-time" type="datetime-local">
+          </div>
+        </details>
+      </div>
+      <div class="sticky-action"><button class="btn primary" id="save-entry" type="button" disabled>保存记录</button></div>
+    </section>
+
+    <section class="screen" id="screen-detail" data-screen="detail" aria-labelledby="detail-title">
+      <header class="topbar">
+        <button class="back" type="button" data-go="timeline" aria-label="返回时间轴">‹</button>
+        <h1 id="detail-title">记录详情</h1>
+        <div class="top-actions"><button class="chip danger" type="button" id="detail-delete">删除</button><button class="chip" type="button" id="detail-save">保存</button></div>
+      </header>
+      <div class="content">
+        <p class="tiny" id="detail-time"></p>
+        <section class="detail-block" aria-labelledby="raw-heading">
+          <h2 id="raw-heading">原始记录 <span class="tag">只读保留</span></h2>
+          <div class="raw-box" id="detail-raw"></div>
+          <p class="input-note">如需修正或补充，请写在“整理后的内容”中，原文不会被覆盖。</p>
+        </section>
+        <section class="detail-block" aria-labelledby="edited-heading">
+          <h2 id="edited-heading">整理后的内容</h2>
+          <textarea id="detail-edited" placeholder="可在这里梳理重点、修正表述或补充背景……"></textarea>
+        </section>
+        <section class="detail-block" aria-labelledby="basic-heading">
+          <h2 id="basic-heading">基本信息</h2>
+          <div class="field"><label for="detail-title-input">标题（可选）</label><input id="detail-title-input" placeholder="不填时显示正文摘要"></div>
+          <div class="field"><label for="detail-category">一级分类</label><select id="detail-category"></select></div>
+          <div class="field"><label>标签（可多选）</label><div class="chips" id="detail-tags"></div></div>
+          <div class="field"><label for="detail-project">项目 / 主题</label><select id="detail-project"></select></div>
+          <div class="field"><label for="detail-occurred">发生时间</label><input id="detail-occurred" type="datetime-local"></div>
+        </section>
+        <details class="options" id="structure-options">
+          <summary>补充结构化信息 <span class="tiny">按需填写</span></summary>
+          <div class="structure-fields">
+            <div class="filter-row">
+              <div><label for="planned-end">计划结束</label><input id="planned-end" type="datetime-local"></div>
+              <div><label for="actual-end">实际结束</label><input id="actual-end" type="datetime-local"></div>
+            </div>
+            <div><label for="overtime-minutes">加班时长（分钟）</label><input id="overtime-minutes" type="number" min="0" inputmode="numeric" placeholder="例如 120"></div>
+            <p class="input-note" id="overtime-calculated">填写计划与实际结束时间后自动计算，可手动覆盖。</p>
+            <div><label for="overtime-reason">加班原因</label><textarea id="overtime-reason" placeholder="例如：负责人决策延迟" style="min-height:90px"></textarea></div>
+            <div class="check-row"><label for="had-rework">是否发生返工</label><select class="tri-select" id="had-rework"><option value="">未填写</option><option value="yes">是</option><option value="no">否</option></select></div>
+            <div class="check-row"><label for="had-change">是否发生需求变化</label><select class="tri-select" id="had-change"><option value="">未填写</option><option value="yes">是</option><option value="no">否</option></select></div>
+            <div class="check-row"><label for="had-delay">是否存在负责人决策延迟</label><select class="tri-select" id="had-delay"><option value="">未填写</option><option value="yes">是</option><option value="no">否</option></select></div>
+            <div><label for="controllable">我能控制的因素</label><textarea id="controllable" style="min-height:90px"></textarea></div>
+            <div><label for="uncontrollable">我不能控制的因素</label><textarea id="uncontrollable" style="min-height:90px"></textarea></div>
+            <div><label for="next-adjustment">下一次准备调整什么</label><textarea id="next-adjustment" style="min-height:90px"></textarea></div>
+          </div>
+        </details>
+      </div>
+    </section>
+
+    <section class="screen" id="screen-timeline" data-screen="timeline" aria-labelledby="timeline-title">
+      <header class="topbar"><div><p class="eyebrow">按发生时间倒序</p><h1 id="timeline-title">时间轴</h1></div><button class="back" type="button" data-go="search" aria-label="搜索">⌕</button></header>
+      <main>
+        <div class="button-row" style="margin-bottom:12px">
+          <button class="chip" id="open-trash" type="button">回收站</button>
+          <button class="chip" id="open-export" type="button">导出</button>
+          <button class="sync-pill" id="sync-status" type="button">仅本机</button>
+        </div>
+        <div class="filter-row">
+          <div><label class="sr-only" for="timeline-category">分类</label><select id="timeline-category"><option value="">全部分类</option></select></div>
+          <div><label class="sr-only" for="timeline-tag">标签</label><select id="timeline-tag"><option value="">全部标签</option></select></div>
+        </div>
+        <div class="filter-row">
+          <div><label class="sr-only" for="timeline-project">项目</label><select id="timeline-project"><option value="">全部项目</option></select></div>
+          <button class="btn secondary" id="timeline-reset" type="button">清除筛选</button>
+        </div>
+        <div id="timeline-records"></div>
+      </main>
+    </section>
+
+    <section class="screen" id="screen-search" data-screen="search" aria-labelledby="search-title">
+      <header class="topbar"><button class="back" type="button" data-go="home" aria-label="返回首页">‹</button><h1 id="search-title">搜索</h1><span></span></header>
+      <main>
+        <div class="search-box">
+          <label class="sr-only" for="search-query">关键词</label>
+          <input id="search-query" type="search" placeholder="搜索原文、整理内容、原因……">
+          <button type="button" id="search-submit" aria-label="执行搜索">⌕</button>
+        </div>
+        <div class="search-hint">试试场景 C：输入“老板 决策 延迟 加班”，或使用“工作 + 加班”筛选。</div>
+        <details class="options" id="search-options">
+          <summary>筛选条件 <span class="tiny">可组合</span></summary>
+          <div class="field"><label for="search-category">分类</label><select id="search-category"><option value="">全部</option></select></div>
+          <div class="field"><label>标签（多选时同时满足）</label><div class="chips" id="search-tags"></div></div>
+          <div class="field"><label for="search-project">项目 / 主题</label><select id="search-project"><option value="">全部项目 / 主题</option></select></div>
+          <div class="filter-row">
+            <div><label for="search-from">开始日期</label><input id="search-from" type="date"></div>
+            <div><label for="search-to">结束日期</label><input id="search-to" type="date"></div>
+          </div>
+          <button class="btn secondary" id="search-reset" type="button" style="width:100%;margin:14px 0">清除条件</button>
+        </details>
+        <p class="result-count" id="result-count"></p>
+        <div id="search-results"></div>
+      </main>
+    </section>
+
+    <nav class="bottom-nav" aria-label="主要导航">
+      <button class="nav-btn active" data-go="home" type="button"><span aria-hidden="true">⌂</span>首页</button>
+      <button class="nav-btn" data-go="timeline" type="button"><span aria-hidden="true">☷</span>时间轴</button>
+      <button class="nav-btn" data-go="search" type="button"><span aria-hidden="true">⌕</span>搜索</button>
+    </nav>
+  </div>
+
+  <dialog id="saved-dialog" aria-labelledby="saved-title">
+    <div class="dialog-body">
+      <h2 id="saved-title">记录已保存</h2>
+      <p class="muted">原始内容已经保留。你可以现在结束，也可以继续补充原因和调整计划。</p>
+      <div class="dialog-actions">
+        <button class="btn primary" id="continue-structure" type="button">补充结构化信息</button>
+        <button class="btn secondary" id="finish-save" type="button">完成</button>
+      </div>
+    </div>
+  </dialog>
+  <dialog id="trash-dialog" aria-labelledby="trash-title">
+    <div class="dialog-body">
+      <h2 id="trash-title">回收站</h2>
+      <p class="muted">删除的记录保留 30 天，期间可以恢复。</p>
+      <div class="dialog-list" id="trash-list"></div>
+      <div class="dialog-actions"><button class="btn secondary" data-close-dialog="trash-dialog" type="button">关闭</button></div>
+    </div>
+  </dialog>
+  <dialog id="export-dialog" aria-labelledby="export-title">
+    <div class="dialog-body">
+      <h2 id="export-title">导出数据</h2>
+      <p class="muted">云端尚未配置，建议定期导出。导出不包含临时音频。</p>
+      <div class="dialog-actions">
+        <button class="btn primary" id="export-json" type="button">完整 JSON</button>
+        <button class="btn secondary" id="export-csv-all" type="button">全部记录 CSV</button>
+        <button class="btn secondary" id="export-csv-filtered" type="button">当前筛选结果 CSV</button>
+        <button class="btn secondary" id="export-markdown" type="button">按月 Markdown</button>
+        <button class="btn secondary" data-close-dialog="export-dialog" type="button">关闭</button>
+      </div>
+    </div>
+  </dialog>
+  <dialog id="tag-dialog" aria-labelledby="tag-title">
+    <div class="dialog-body">
+      <h2 id="tag-title">标签管理</h2>
+      <p class="muted">标签采用停用/恢复，不会删除历史关联。</p>
+      <div class="dialog-list" id="tag-list"></div>
+      <div class="dialog-actions"><button class="btn secondary" data-close-dialog="tag-dialog" type="button">关闭</button></div>
+    </div>
+  </dialog>
+  <dialog id="sync-dialog" aria-labelledby="sync-title">
+    <div class="dialog-body">
+      <h2 id="sync-title">当前仅保存在本机</h2>
+      <p class="muted">离线记录、搜索、回收站和导出已经可用。邮箱 Magic Link、云端加密存储和自动同步需要先选择并配置云服务，目前不会假装同步成功。</p>
+      <div class="dialog-actions"><button class="btn primary" id="sync-export-shortcut" type="button">立即完整导出</button><button class="btn secondary" data-close-dialog="sync-dialog" type="button">知道了</button></div>
+    </div>
+  </dialog>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script type="text/plain" id="legacy-prototype-script">
+    const categories = ["工作", "生活", "人际", "家庭", "学习"];
+    const tags = ["加班", "返工", "沟通", "老板决策", "临时任务", "工作错误", "项目管理", "工作方法", "项目复盘"];
+    const projects = ["新官网改版", "个人成长"];
+    const demoVoiceText = "今天原本下午应该确定方案，但是老板到晚上9点才确定，所以后续制作被压缩，我又工作到晚上11点。";
+    const now = new Date();
+    const isoLocal = date => {
+      const offset = date.getTimezoneOffset();
+      return new Date(date.getTime() - offset * 60000).toISOString().slice(0, 16);
+    };
+    const todayAt = (hour, minute = 0) => {
+      const d = new Date(); d.setHours(hour, minute, 0, 0); return d.toISOString();
+    };
+    let entries = [
+      {
+        id: "e-work-delay", createdAt: todayAt(23, 8), occurredAt: todayAt(21, 0), sourceType: "voice",
+        title: "老板决策延迟导致加班", rawText: demoVoiceText,
+        editedText: "方案确认比计划晚 6 小时，制作时间被压缩，最终加班到 23:00。",
+        category: "工作", tags: ["加班", "老板决策"], project: "新官网改版",
+        overtimeMinutes: "120", overtimeReason: "负责人决策延迟，导致后续制作时间被压缩。",
+        hadRework: "no", hadChange: "no", hadDelay: "yes",
+        controllable: "可以提前准备两个方案分支，并更早提醒确认截止时间。",
+        uncontrollable: "最终决策时间不由我控制。", nextAdjustment: "下午 3 点仍未确认时主动提示对交付时间的影响。"
+      },
+      {
+        id: "e-people", createdAt: todayAt(18, 35), occurredAt: todayAt(18, 20), sourceType: "text",
+        title: "沟通后的一个提醒", rawText: "刚才聊天时我太急着解释，没有先确认对方真正担心什么。",
+        editedText: "下次先复述对方的担忧，再表达自己的看法。", category: "人际", tags: ["沟通"], project: "",
+        overtimeMinutes: "", overtimeReason: "", hadRework: "", hadChange: "", hadDelay: "", controllable: "", uncontrollable: "", nextAdjustment: ""
+      },
+      {
+        id: "e-learning", createdAt: new Date(Date.now() - 86400000 * 2).toISOString(), occurredAt: new Date(Date.now() - 86400000 * 2).toISOString(), sourceType: "text",
+        title: "复盘比收藏更有用", rawText: "今天把上周学到的方法实际用了一遍，发现复述一次比收藏链接更有帮助。",
+        editedText: "", category: "学习", tags: ["工作方法"], project: "个人成长",
+        overtimeMinutes: "", overtimeReason: "", hadRework: "", hadChange: "", hadDelay: "", controllable: "", uncontrollable: "", nextAdjustment: ""
+      }
+    ];
+    let currentEntryId = entries[0].id;
+    let captureMode = "text";
+    let selectedCaptureCategory = "";
+    let selectedCaptureTags = [];
+    let recording = false;
+
+    const $ = selector => document.querySelector(selector);
+    const $$ = selector => [...document.querySelectorAll(selector)];
+    const escapeHtml = value => String(value ?? "").replace(/[&<>'"]/g, char => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[char]));
+    const formatDateTime = value => new Intl.DateTimeFormat("zh-CN", {month:"long", day:"numeric", hour:"2-digit", minute:"2-digit"}).format(new Date(value));
+    const formatDay = value => new Intl.DateTimeFormat("zh-CN", {month:"long", day:"numeric", weekday:"short"}).format(new Date(value));
+    const entryDate = entry => entry.occurredAt || entry.createdAt;
+    const summary = entry => entry.title || entry.rawText.slice(0, 34) + (entry.rawText.length > 34 ? "…" : "");
+
+    function showToast(message) {
+      const toast = $("#toast"); toast.textContent = message; toast.classList.add("show");
+      clearTimeout(showToast.timer); showToast.timer = setTimeout(() => toast.classList.remove("show"), 1800);
+    }
+
+    function go(screen, options = {}) {
+      $$(".screen").forEach(el => el.classList.toggle("active", el.dataset.screen === screen));
+      $$(".nav-btn").forEach(btn => btn.classList.toggle("active", btn.dataset.go === screen));
+      if (screen === "capture") prepareCapture(options.mode || "text", options.autoRecord || false);
+      if (screen === "home") renderHome();
+      if (screen === "timeline") renderTimeline();
+      if (screen === "search") { runSearch(); setTimeout(() => $("#search-query").focus(), 0); }
+      if (screen === "detail") renderDetail(options.openStructure || false);
+      window.scrollTo(0, 0);
+    }
+
+    function optionMarkup(items, includeBlank, blankText) {
+      return (includeBlank ? `<option value="">${escapeHtml(blankText)}</option>` : "") + items.map(item => `<option value="${escapeHtml(item)}">${escapeHtml(item)}</option>`).join("");
+    }
+
+    function renderPicker(container, items, selected, onClick) {
+      container.innerHTML = items.map(item => `<button class="chip ${selected.includes(item) ? "selected" : ""}" type="button" data-value="${escapeHtml(item)}" aria-pressed="${selected.includes(item)}">${escapeHtml(item)}</button>`).join("");
+      container.querySelectorAll("button").forEach(btn => btn.addEventListener("click", () => onClick(btn.dataset.value)));
+    }
+
+    function recordCard(entry) {
+      const metaTags = [entry.category, ...entry.tags].filter(Boolean).map((item, index) => `<span class="tag ${index === 0 ? "category" : ""}">${escapeHtml(item)}</span>`).join("");
+      return `<button class="card record-card" type="button" data-entry="${entry.id}"><span class="tiny">${formatDateTime(entryDate(entry))} · ${entry.sourceType === "voice" ? "语音" : "文字"}</span><div class="summary"><strong>${escapeHtml(summary(entry))}</strong></div><div class="meta">${metaTags}${entry.project ? `<span class="tag">项目：${escapeHtml(entry.project)}</span>` : ""}</div></button>`;
+    }
+
+    function bindRecordCards(root) {
+      root.querySelectorAll("[data-entry]").forEach(card => card.addEventListener("click", () => { currentEntryId = card.dataset.entry; go("detail"); }));
+    }
+
+    function renderHome() {
+      const recent = [...new Set(entries.map(e => e.category).filter(Boolean))].slice(0, 4);
+      $("#recent-categories").innerHTML = recent.map(item => `<button class="chip" type="button" data-category="${escapeHtml(item)}">${escapeHtml(item)}</button>`).join("");
+      $("#recent-categories").querySelectorAll("button").forEach(btn => btn.addEventListener("click", () => { $("#timeline-category").value = btn.dataset.category; go("timeline"); }));
+      const todayKey = new Date().toDateString();
+      const todayEntries = entries.filter(e => new Date(entryDate(e)).toDateString() === todayKey).sort((a,b) => new Date(entryDate(b)) - new Date(entryDate(a))).slice(0, 3);
+      $("#home-records").innerHTML = todayEntries.length ? todayEntries.map(recordCard).join("") : `<div class="empty">今天还没有记录</div>`;
+      bindRecordCards($("#home-records"));
+    }
+
+    function resetCapture() {
+      $("#raw-text").value = ""; $("#voice-transcript").value = ""; $("#transcript-wrap").hidden = true;
+      selectedCaptureCategory = ""; selectedCaptureTags = []; $("#capture-project").value = "";
+      $("#capture-time").value = isoLocal(new Date()); $("#capture-options").open = false; recording = false;
+      updateVoiceButton(); updateSaveState(); renderCapturePickers();
+    }
+
+    function prepareCapture(mode, autoRecord) {
+      resetCapture(); setCaptureMode(mode);
+      if (mode === "text") setTimeout(() => $("#raw-text").focus(), 0);
+      if (mode === "voice" && autoRecord) startRecording();
+    }
+
+    function setCaptureMode(mode) {
+      captureMode = mode;
+      $("#text-mode").classList.toggle("active", mode === "text"); $("#voice-mode").classList.toggle("active", mode === "voice");
+      $("#text-mode").setAttribute("aria-selected", String(mode === "text")); $("#voice-mode").setAttribute("aria-selected", String(mode === "voice"));
+      $("#text-panel").classList.toggle("hidden", mode !== "text"); $("#voice-panel").classList.toggle("active", mode === "voice");
+      updateSaveState();
+    }
+
+    function renderCapturePickers() {
+      renderPicker($("#capture-categories"), categories, selectedCaptureCategory ? [selectedCaptureCategory] : [], item => { selectedCaptureCategory = selectedCaptureCategory === item ? "" : item; renderCapturePickers(); });
+      renderPicker($("#capture-tags"), tags, selectedCaptureTags, item => { selectedCaptureTags = selectedCaptureTags.includes(item) ? selectedCaptureTags.filter(t => t !== item) : [...selectedCaptureTags, item]; renderCapturePickers(); });
+    }
+
+    function startRecording() {
+      recording = true; $("#voice-transcript").value = ""; $("#transcript-wrap").hidden = true; updateVoiceButton(); updateSaveState();
+    }
+
+    function stopRecording() {
+      recording = false; $("#voice-transcript").value = demoVoiceText; $("#transcript-wrap").hidden = false; updateVoiceButton(); updateSaveState();
+    }
+
+    function updateVoiceButton() {
+      const button = $("#voice-record"); button.classList.toggle("recording", recording); button.setAttribute("aria-pressed", String(recording));
+      button.textContent = recording ? "结束录音" : "开始录音";
+      $("#voice-status").innerHTML = recording ? `<strong>正在录音…</strong><br><span class="tiny">说完后点击“结束录音”</span>` : `<strong>${$("#voice-transcript").value ? "转写完成" : "准备录音"}</strong><br><span class="tiny">${$("#voice-transcript").value ? "可检查原始转写后保存" : "本原型用示例文本模拟转写"}</span>`;
+    }
+
+    function updateSaveState() {
+      const text = captureMode === "voice" ? $("#voice-transcript").value : $("#raw-text").value;
+      $("#save-entry").disabled = !text.trim() || recording;
+      $("#char-count").textContent = $("#raw-text").value.length;
+    }
+
+    function saveNewEntry() {
+      const rawText = (captureMode === "voice" ? $("#voice-transcript").value : $("#raw-text").value).trim();
+      if (!rawText) return;
+      const id = `e-${Date.now()}`;
+      const occurredValue = $("#capture-time").value;
+      entries.unshift({
+        id, createdAt: new Date().toISOString(), occurredAt: occurredValue ? new Date(occurredValue).toISOString() : "", sourceType: captureMode,
+        title: "", rawText, editedText: "", category: selectedCaptureCategory, tags: [...selectedCaptureTags], project: $("#capture-project").value,
+        overtimeMinutes: "", overtimeReason: "", hadRework: "", hadChange: "", hadDelay: "", controllable: "", uncontrollable: "", nextAdjustment: ""
+      });
+      currentEntryId = id; $("#saved-dialog").showModal();
+    }
+
+    function renderDetail(openStructure = false) {
+      const entry = entries.find(e => e.id === currentEntryId) || entries[0]; currentEntryId = entry.id;
+      $("#detail-time").textContent = `${formatDateTime(entryDate(entry))} · ${entry.sourceType === "voice" ? "语音记录" : "文字记录"}`;
+      $("#detail-raw").textContent = entry.rawText; $("#detail-edited").value = entry.editedText || ""; $("#detail-title-input").value = entry.title || "";
+      $("#detail-category").innerHTML = optionMarkup(categories, true, "未分类"); $("#detail-category").value = entry.category || "";
+      $("#detail-project").innerHTML = optionMarkup(projects, true, "无项目"); $("#detail-project").value = entry.project || "";
+      $("#detail-occurred").value = entry.occurredAt ? isoLocal(new Date(entry.occurredAt)) : "";
+      const renderDetailTags = () => renderPicker($("#detail-tags"), tags, entry.tags, item => {
+        entry.tags = entry.tags.includes(item) ? entry.tags.filter(t => t !== item) : [...entry.tags, item];
+        renderDetailTags();
+      });
+      renderDetailTags();
+      $("#overtime-minutes").value = entry.overtimeMinutes || ""; $("#overtime-reason").value = entry.overtimeReason || "";
+      $("#had-rework").value = entry.hadRework || ""; $("#had-change").value = entry.hadChange || ""; $("#had-delay").value = entry.hadDelay || "";
+      $("#controllable").value = entry.controllable || ""; $("#uncontrollable").value = entry.uncontrollable || ""; $("#next-adjustment").value = entry.nextAdjustment || "";
+      $("#planned-end").value = entry.plannedEnd || ""; $("#actual-end").value = entry.actualEnd || "";
+      $("#structure-options").open = openStructure;
+    }
+
+    function saveDetail() {
+      const entry = entries.find(e => e.id === currentEntryId); if (!entry) return;
+      entry.editedText = $("#detail-edited").value.trim(); entry.title = $("#detail-title-input").value.trim(); entry.category = $("#detail-category").value;
+      entry.project = $("#detail-project").value; entry.occurredAt = $("#detail-occurred").value ? new Date($("#detail-occurred").value).toISOString() : "";
+      entry.plannedEnd = $("#planned-end").value; entry.actualEnd = $("#actual-end").value; entry.overtimeMinutes = $("#overtime-minutes").value;
+      entry.overtimeReason = $("#overtime-reason").value.trim(); entry.hadRework = $("#had-rework").value; entry.hadChange = $("#had-change").value; entry.hadDelay = $("#had-delay").value;
+      entry.controllable = $("#controllable").value.trim(); entry.uncontrollable = $("#uncontrollable").value.trim(); entry.nextAdjustment = $("#next-adjustment").value.trim();
+      entry.updatedAt = new Date().toISOString(); showToast("修改已保存（原始记录未改变）");
+    }
+
+    function renderTimeline() {
+      const cat = $("#timeline-category").value, tag = $("#timeline-tag").value, project = $("#timeline-project").value;
+      const filtered = entries.filter(e => (!cat || e.category === cat) && (!tag || e.tags.includes(tag)) && (!project || e.project === project)).sort((a,b) => new Date(entryDate(b)) - new Date(entryDate(a)));
+      const grouped = filtered.reduce((map, entry) => { const day = formatDay(entryDate(entry)); (map[day] ||= []).push(entry); return map; }, {});
+      $("#timeline-records").innerHTML = filtered.length ? Object.entries(grouped).map(([day, list]) => `<h2 class="date-heading">${day}</h2>${list.map(recordCard).join("")}`).join("") : `<div class="empty" style="margin-top:20px">没有符合条件的记录</div>`;
+      bindRecordCards($("#timeline-records"));
+    }
+
+    function runSearch() {
+      const query = $("#search-query").value.trim().toLowerCase();
+      const tokens = query.split(/\s+/).filter(Boolean);
+      const cat = $("#search-category").value, tag = $("#search-tag").value, project = $("#search-project").value;
+      const from = $("#search-from").value ? new Date($("#search-from").value + "T00:00:00") : null;
+      const to = $("#search-to").value ? new Date($("#search-to").value + "T23:59:59") : null;
+      const hasCondition = tokens.length || cat || tag || project || from || to;
+      const filtered = hasCondition ? entries.filter(entry => {
+        const haystack = [entry.title, entry.rawText, entry.editedText, entry.overtimeReason, entry.controllable, entry.uncontrollable, entry.nextAdjustment, entry.category, entry.project, ...entry.tags].join(" ").toLowerCase();
+        const date = new Date(entryDate(entry));
+        return tokens.every(token => haystack.includes(token)) && (!cat || entry.category === cat) && (!tag || entry.tags.includes(tag)) && (!project || entry.project === project) && (!from || date >= from) && (!to || date <= to);
+      }) : [];
+      $("#result-count").textContent = hasCondition ? `找到 ${filtered.length} 条记录` : "输入关键词或选择筛选条件";
+      $("#search-results").innerHTML = hasCondition ? (filtered.length ? filtered.map(recordCard).join("") : `<div class="empty">没有找到。可以减少关键词或清除筛选条件。</div>`) : "";
+      bindRecordCards($("#search-results"));
+    }
+
+    function initializeSelects() {
+      $("#capture-project").innerHTML = optionMarkup(projects, true, "不选择项目");
+      ["#detail-category", "#timeline-category", "#search-category"].forEach((id, index) => $(id).innerHTML = optionMarkup(categories, true, index === 0 ? "未分类" : index === 1 ? "全部分类" : "全部"));
+      ["#timeline-tag", "#search-tag"].forEach(id => $(id).innerHTML = optionMarkup(tags, true, "全部标签"));
+      ["#detail-project", "#timeline-project", "#search-project"].forEach((id, index) => $(id).innerHTML = optionMarkup(projects, true, index === 0 ? "无项目" : "全部项目"));
+    }
+
+    $$('[data-go]').forEach(button => button.addEventListener("click", () => go(button.dataset.go)));
+    $("#home-text-entry").addEventListener("click", () => go("capture", {mode:"text"}));
+    $("#home-voice-entry").addEventListener("click", () => go("capture", {mode:"voice", autoRecord:true}));
+    $("#text-mode").addEventListener("click", () => setCaptureMode("text"));
+    $("#voice-mode").addEventListener("click", () => setCaptureMode("voice"));
+    $("#voice-record").addEventListener("click", () => recording ? stopRecording() : startRecording());
+    $("#raw-text").addEventListener("input", updateSaveState); $("#voice-transcript").addEventListener("input", updateSaveState);
+    $("#save-entry").addEventListener("click", saveNewEntry);
+    $("#finish-save").addEventListener("click", () => { $("#saved-dialog").close(); go("detail"); });
+    $("#continue-structure").addEventListener("click", () => { $("#saved-dialog").close(); go("detail", {openStructure:true}); });
+    $("#detail-save").addEventListener("click", saveDetail);
+    ["#timeline-category", "#timeline-tag", "#timeline-project"].forEach(id => $(id).addEventListener("change", renderTimeline));
+    $("#timeline-reset").addEventListener("click", () => { $("#timeline-category").value = ""; $("#timeline-tag").value = ""; $("#timeline-project").value = ""; renderTimeline(); });
+    $("#search-submit").addEventListener("click", runSearch); $("#search-query").addEventListener("input", runSearch);
+    ["#search-category", "#search-tag", "#search-project", "#search-from", "#search-to"].forEach(id => $(id).addEventListener("change", runSearch));
+    $("#search-reset").addEventListener("click", () => { ["#search-query", "#search-category", "#search-tag", "#search-project", "#search-from", "#search-to"].forEach(id => $(id).value = ""); runSearch(); });
+
+    initializeSelects(); renderCapturePickers(); $("#capture-time").value = isoLocal(now); renderHome();
+  </script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
