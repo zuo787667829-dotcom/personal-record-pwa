@@ -73,7 +73,7 @@
     .quick-action.primary { background: var(--accent); color: white; }
     .quick-action .icon { font-size: 1.5rem; }
     .quick-action strong { font-size: 1rem; }
-    #screen-home { padding-bottom: calc(190px + env(safe-area-inset-bottom)); }
+    #screen-home { padding-bottom: calc(88px + env(safe-area-inset-bottom)); }
     #screen-home .quick-grid {
       position: fixed; z-index: 19; left: 50%; transform: translateX(-50%);
       bottom: calc(82px + env(safe-area-inset-bottom));
@@ -101,6 +101,12 @@
     .nav-btn { min-height: 52px; border: 0; background: transparent; color: var(--muted); font-size: .82rem; }
     .nav-btn span { display: block; font-size: 1.15rem; line-height: 1.1; }
     .nav-btn.active { color: var(--accent); font-weight: 700; }
+    .voice-nav { color: var(--accent); font-weight: 600; }
+    .voice-nav span { width: 46px; height: 30px; margin: 0 auto 3px; border-radius: 15px; display: grid; place-items: center; background: var(--accent); color: white; }
+    #screen-timeline { padding-bottom: calc(160px + env(safe-area-inset-bottom)); }
+    .timeline-search { position: fixed; z-index: 19; left: 50%; transform: translateX(-50%); bottom: calc(76px + env(safe-area-inset-bottom)); width: min(calc(100% - 32px), 398px); padding: 8px; border-radius: 18px; background: rgba(242,242,247,.97); box-shadow: 0 2px 12px rgba(0,0,0,.06); }
+    .timeline-search input { padding-right: 44px; }
+    .timeline-search button { right: 12px; top: 12px; }
     .bottom-nav.flow-hidden { display: none; }
     .prototype-shell.focus-flow .sticky-action { bottom: 0; padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
     .prototype-shell.focus-flow .screen.active { padding-bottom: 72px; }
@@ -151,6 +157,7 @@
     .date-heading { margin: 22px 0 8px; font-size: .9rem; color: var(--muted); font-weight: 700; }
     .empty { padding: 34px 18px; text-align: center; color: var(--muted); border: 1px dashed var(--line); border-radius: var(--radius); }
     .search-box { position: relative; }
+    .search-box.timeline-search { position: fixed; }
     .search-box input { padding-right: 52px; }
     .search-box button { position: absolute; right: 4px; top: 4px; width: 40px; height: 38px; border: 0; background: transparent; }
     .search-hint { margin: 12px 0 14px; padding: 11px 12px; border-radius: 10px; background: var(--accent-soft); font-size: .86rem; }
@@ -209,6 +216,7 @@
       .prototype-shell { min-height: calc(100vh - 48px); border: 1px solid #c8ccd3; border-radius: 28px; box-shadow: 0 18px 60px rgba(32,36,43,.15); }
       .screen { min-height: calc(100vh - 48px); }
       .bottom-nav { bottom: 24px; border-radius: 0 0 28px 28px; }
+      .timeline-search { bottom: calc(100px + env(safe-area-inset-bottom)); }
       #screen-home .quick-grid { bottom: calc(106px + env(safe-area-inset-bottom)); }
     }
     @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
@@ -223,14 +231,6 @@
         <div><p class="eyebrow" id="home-date"></p><h1 id="home-title">拾记</h1></div>
       </header>
       <main>
-        <div class="quick-grid">
-          <button class="quick-action primary" type="button" id="home-voice-entry">
-            <span class="icon" aria-hidden="true">●</span><strong>语音记录</strong><span>点击开始说话</span>
-          </button>
-          <button class="quick-action" type="button" id="home-text-entry">
-            <span class="icon" aria-hidden="true">✎</span><strong>文字记录</strong><span>直接输入文字</span>
-          </button>
-        </div>
 
         <section class="section" aria-labelledby="recent-categories-title">
           <div class="section-head"><h2 id="recent-categories-title">最近使用分类</h2></div>
@@ -271,7 +271,7 @@
           </div>
           <div class="transcript-editor" id="transcript-wrap">
             <div class="row-title"><label for="voice-transcript" style="margin:0">转写文字</label><span class="tiny">可以编辑</span></div>
-            <textarea id="voice-transcript" maxlength="4000" placeholder="停止录音后，转写文字会显示在这里……"></textarea>
+            <textarea id="voice-transcript" maxlength="4000" placeholder="转写文字显示在这里，也可以点击直接输入……"></textarea>
             <p class="input-note">API 接入前，也可以点输入框使用 iPhone 键盘听写。保存后原始转写不会被覆盖。</p>
           </div>
         </div>
@@ -371,27 +371,11 @@
           <button class="chip" id="open-export" type="button">导出</button>
           <button class="sync-pill" id="sync-status" type="button">仅本机</button>
         </div>
-        <div class="filter-row">
-          <div><label class="sr-only" for="timeline-category">分类</label><select id="timeline-category"><option value="">全部分类</option></select></div>
-          <div><label class="sr-only" for="timeline-tag">标签</label><select id="timeline-tag"><option value="">全部标签</option></select></div>
-        </div>
-        <div class="filter-row">
-          <div><label class="sr-only" for="timeline-project">项目</label><select id="timeline-project"><option value="">全部项目</option></select></div>
-          <button class="btn secondary" id="timeline-reset" type="button">清除筛选</button>
-        </div>
-        <div id="timeline-records"></div>
-      </main>
-    </section>
-
-    <section class="screen" id="screen-search" data-screen="search" aria-labelledby="search-title">
-      <header class="topbar"><button class="back" type="button" data-go="home" aria-label="返回首页">‹</button><h1 id="search-title">搜索</h1><span></span></header>
-      <main>
-        <div class="search-box">
+        <div class="search-box timeline-search">
           <label class="sr-only" for="search-query">关键词</label>
           <input id="search-query" type="search" placeholder="搜索原文、整理内容、原因……">
           <button type="button" id="search-submit" aria-label="执行搜索">⌕</button>
         </div>
-        <div class="search-hint">试试场景 C：输入“老板 决策 延迟 加班”，或使用“工作 + 加班”筛选。</div>
         <details class="options" id="search-options">
           <summary>筛选条件 <span class="tiny">可组合</span></summary>
           <div class="field"><label for="search-category">分类</label><select id="search-category"><option value="">全部</option></select></div>
@@ -410,8 +394,8 @@
 
     <nav class="bottom-nav" aria-label="主要导航">
       <button class="nav-btn active" data-go="home" type="button"><span aria-hidden="true">⌂</span>首页</button>
+      <button class="nav-btn voice-nav" id="nav-voice" type="button"><span aria-hidden="true">●</span>语音输入</button>
       <button class="nav-btn" data-go="timeline" type="button"><span aria-hidden="true">☷</span>时间轴</button>
-      <button class="nav-btn" data-go="search" type="button"><span aria-hidden="true">⌕</span>搜索</button>
     </nav>
   </div>
 

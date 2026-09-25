@@ -1,4 +1,4 @@
-const CACHE_NAME = "shiji-shell-v14";
+const CACHE_NAME = "shiji-shell-v15";
 const APP_SHELL = [
   "./",
   "./index.html",

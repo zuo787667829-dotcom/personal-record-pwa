@@ -217,7 +217,6 @@ function go(screen, options = {}) {
   if (screen === "capture") prepareCapture(options.mode || "text", options.autoRecord || false);
   if (screen === "home") renderHome();
   if (screen === "timeline") renderTimeline();
-  if (screen === "search") { runSearch(); setTimeout(() => $("#search-query").focus(), 0); }
   if (screen === "detail") renderDetail(options.openStructure || false);
   window.scrollTo(0, 0);
 }
@@ -230,7 +229,7 @@ function renderHome() {
     ? recentCategories.map(item => `<button class="chip" type="button" data-category="${item.id}">${escapeHtml(item.name)}</button>`).join("")
     : `<span class="tiny">记录后会显示最近分类</span>`;
   $("#recent-categories").querySelectorAll("button").forEach(button => button.addEventListener("click", () => {
-    $("#timeline-category").value = button.dataset.category;
+    $("#search-category").value = button.dataset.category;
     go("timeline");
   }));
   const todayKey = new Date().toDateString();
@@ -507,18 +506,7 @@ async function moveCurrentToTrash() {
 }
 
 function renderTimeline() {
-  const categoryId = $("#timeline-category").value;
-  const tagId = $("#timeline-tag").value;
-  const projectId = $("#timeline-project").value;
-  const filtered = activeEntries().filter(entry => (!categoryId || entry.category_id === categoryId) && (!tagId || entry.tag_ids.includes(tagId)) && (!projectId || entry.project_id === projectId)).sort((a, b) => new Date(entryDate(b)) - new Date(entryDate(a)));
-  state.currentFilteredEntryIds = filtered.map(entry => entry.id);
-  const grouped = filtered.reduce((map, entry) => {
-    const day = formatDay(entryDate(entry));
-    (map[day] ||= []).push(entry);
-    return map;
-  }, {});
-  $("#timeline-records").innerHTML = filtered.length ? Object.entries(grouped).map(([day, list]) => `<h2 class="date-heading">${day}</h2>${list.map(recordCard).join("")}`).join("") : `<div class="empty" style="margin-top:20px">没有符合条件的记录</div>`;
-  bindRecordCards($("#timeline-records"));
+  runSearch();
   setStatus();
 }
 
@@ -533,7 +521,7 @@ function runSearch() {
   const from = $("#search-from").value ? new Date(`${$("#search-from").value}T00:00:00`) : null;
   const to = $("#search-to").value ? new Date(`${$("#search-to").value}T23:59:59`) : null;
   const hasCondition = tokens.length || categoryId || projectId || state.searchTagIds.length || from || to;
-  const filtered = hasCondition ? activeEntries().filter(entry => {
+  const filtered = activeEntries().filter(entry => {
     const haystack = searchableText(entry);
     const date = new Date(entryDate(entry));
     return tokens.every(token => haystack.includes(token))
@@ -542,10 +530,15 @@ function runSearch() {
       && state.searchTagIds.every(tagId => entry.tag_ids.includes(tagId))
       && (!from || date >= from)
       && (!to || date <= to);
-  }).sort((a, b) => new Date(entryDate(b)) - new Date(entryDate(a))) : [];
+  }).sort((a, b) => new Date(entryDate(b)) - new Date(entryDate(a)));
   state.currentFilteredEntryIds = filtered.map(entry => entry.id);
-  $("#result-count").textContent = hasCondition ? `找到 ${filtered.length} 条记录` : "输入关键词或选择筛选条件";
-  $("#search-results").innerHTML = hasCondition ? (filtered.length ? filtered.map(recordCard).join("") : `<div class="empty">没有找到。可以减少关键词或清除筛选条件。</div>`) : "";
+  $("#result-count").textContent = hasCondition ? `找到 ${filtered.length} 条记录` : `共 ${filtered.length} 条记录`;
+  const grouped = filtered.reduce((map, entry) => {
+    const day = isoLocal(entryDate(entry)).slice(0, 10);
+    (map[day] ||= []).push(entry);
+    return map;
+  }, {});
+  $("#search-results").innerHTML = filtered.length ? Object.entries(grouped).map(([day, entries]) => `<h2 class="date-heading">${day}</h2>${entries.map(recordCard).join("")}`).join("") : `<div class="empty">${hasCondition ? "没有找到，可以减少关键词或清除筛选。" : "还没有记录，点下方语音输入开始。"}</div>`;
   bindRecordCards($("#search-results"));
 }
 
@@ -682,24 +675,21 @@ function exportMarkdown() {
 }
 
 function initializeSelects() {
-  $("#timeline-category").innerHTML = optionMarkup(state.categories, "全部分类");
   $("#search-category").innerHTML = optionMarkup(state.categories, "全部分类");
-  $("#timeline-tag").innerHTML = `<option value="">全部标签</option>${state.tags.map(tag => `<option value="${tag.id}">${escapeHtml(tag.name)}${tag.is_active ? "" : "（停用）"}</option>`).join("")}`;
-  $("#timeline-project").innerHTML = `<option value="">全部项目 / 主题</option>${state.projects.map(project => `<option value="${project.id}">${escapeHtml(project.name)}${project.is_archived ? "（归档）" : ""}</option>`).join("")}`;
-  $("#search-project").innerHTML = $("#timeline-project").innerHTML;
+  $("#search-project").innerHTML = `<option value="">全部项目 / 主题</option>${state.projects.map(project => `<option value="${project.id}">${escapeHtml(project.name)}${project.is_archived ? "（归档）" : ""}</option>`).join("")}`;
   renderSearchTags();
 }
 
 function bindEvents() {
   $$('[data-go]').forEach(button => button.addEventListener("click", () => go(button.dataset.go)));
-  $("#home-text-entry").addEventListener("click", () => go("capture", { mode: "text" }));
-  $("#home-voice-entry").addEventListener("click", () => go("capture", { mode: "voice", autoRecord: true }));
+  $("#nav-voice").addEventListener("click", () => go("capture", { mode: "voice", autoRecord: true }));
   $("#cancel-capture").addEventListener("click", cancelCapture);
   $("#text-mode").addEventListener("click", () => setCaptureMode("text"));
   $("#voice-mode").addEventListener("click", () => setCaptureMode("voice"));
   $("#voice-record").addEventListener("click", () => state.recording ? stopRecording() : startRecording());
   $("#raw-text").addEventListener("input", updateSaveState);
   $("#voice-transcript").addEventListener("input", updateSaveState);
+  $("#voice-transcript").addEventListener("focus", () => { if (state.recording) stopRecording(); });
   $("#capture-entry-title").addEventListener("input", updateCaptureTitlePreview);
   $("#capture-time").addEventListener("change", updateCaptureTitlePreview);
   $("#save-entry").addEventListener("click", saveNewEntry);
@@ -714,8 +704,6 @@ function bindEvents() {
   $("#planned-end").addEventListener("change", () => updateOvertimeCalculation(false));
   $("#actual-end").addEventListener("change", () => updateOvertimeCalculation(false));
   $("#overtime-minutes").addEventListener("input", () => { $("#overtime-minutes").dataset.manual = "true"; });
-  ["#timeline-category", "#timeline-tag", "#timeline-project"].forEach(id => $(id).addEventListener("change", renderTimeline));
-  $("#timeline-reset").addEventListener("click", () => { $("#timeline-category").value = ""; $("#timeline-tag").value = ""; $("#timeline-project").value = ""; renderTimeline(); });
   $("#search-submit").addEventListener("click", runSearch);
   $("#search-query").addEventListener("input", runSearch);
   ["#search-category", "#search-project", "#search-from", "#search-to"].forEach(id => $(id).addEventListener("change", runSearch));
