@@ -73,6 +73,18 @@
     .quick-action.primary { background: var(--accent); color: white; }
     .quick-action .icon { font-size: 1.5rem; }
     .quick-action strong { font-size: 1rem; }
+    #screen-home { padding-bottom: calc(190px + env(safe-area-inset-bottom)); }
+    #screen-home .quick-grid {
+      position: fixed; z-index: 19; left: 50%; transform: translateX(-50%);
+      bottom: calc(82px + env(safe-area-inset-bottom));
+      width: min(calc(100% - 32px), 398px); grid-template-columns: 1fr 100px;
+      gap: 10px; padding: 8px; border-radius: 23px;
+      background: rgba(242,242,247,.95); box-shadow: 0 4px 20px rgba(0,0,0,.08);
+    }
+    #screen-home .quick-action { min-height: 64px; padding: 12px; align-items: center; justify-content: center; gap: 4px; text-align: center; }
+    #screen-home .quick-action.primary { flex-direction: row; gap: 10px; }
+    #screen-home .quick-action > span:last-child:not(.icon) { display: none; }
+    #screen-home .quick-action .icon { font-size: 1.25rem; }
     .chips { display: flex; flex-wrap: wrap; gap: 8px; }
     .chip {
       min-height: 34px; padding: 5px 11px; border: .5px solid var(--line); border-radius: 999px;
@@ -197,6 +209,7 @@
       .prototype-shell { min-height: calc(100vh - 48px); border: 1px solid #c8ccd3; border-radius: 28px; box-shadow: 0 18px 60px rgba(32,36,43,.15); }
       .screen { min-height: calc(100vh - 48px); }
       .bottom-nav { bottom: 24px; border-radius: 0 0 28px 28px; }
+      #screen-home .quick-grid { bottom: calc(106px + env(safe-area-inset-bottom)); }
     }
     @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
   </style>
@@ -210,7 +223,6 @@
         <div><p class="eyebrow" id="home-date"></p><h1 id="home-title">拾记</h1></div>
       </header>
       <main>
-        <h2>现在想记什么？</h2>
         <div class="quick-grid">
           <button class="quick-action primary" type="button" id="home-voice-entry">
             <span class="icon" aria-hidden="true">●</span><strong>语音记录</strong><span>点击开始说话</span>
