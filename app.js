@@ -297,15 +297,12 @@ function prepareCapture(mode, autoRecord) {
 }
 
 function setCaptureMode(mode) {
+  mode = "voice";
   if (mode !== "voice" && state.recording) stopRecording();
   if (mode !== "voice" && state.voiceStarting) { state.voiceGeneration++; state.voiceStarting = false; updateVoiceButton(); }
   state.captureMode = mode;
-  $("#capture-title").textContent = mode === "voice" ? "语音记录" : "文字记录";
-  $("#capture-mode-note").textContent = mode === "voice" ? "停止后可编辑" : "只需正文";
-  $("#text-mode").classList.toggle("active", mode === "text");
-  $("#voice-mode").classList.toggle("active", mode === "voice");
-  $("#text-mode").setAttribute("aria-selected", String(mode === "text"));
-  $("#voice-mode").setAttribute("aria-selected", String(mode === "voice"));
+  $("#capture-title").textContent = "记录";
+  $("#capture-mode-note").textContent = "随时记下";
   $("#text-panel").classList.toggle("hidden", mode !== "text");
   $("#voice-panel").classList.toggle("active", mode === "voice");
   $("#transcript-wrap").hidden = mode !== "voice";
@@ -352,7 +349,7 @@ async function startRecording() {
     const recorder = new MediaRecorder(stream);
     state.recorder = recorder;
     state.pendingAudioBlob = null; state.rawTranscript = null; state.voiceMessage = "";
-    $("#voice-transcript").value = "";
+    // Preserve any text already typed before starting the recording.
     recorder.addEventListener("dataavailable", event => { if (event.data.size) chunks.push(event.data); });
     recorder.addEventListener("stop", async () => {
       stream.getTracks().forEach(track => track.stop());
@@ -384,7 +381,7 @@ async function startRecording() {
     $("#voice-status").innerHTML = `<strong>没有取得独立录音权限</strong><br><span class="tiny">仍可使用上方的 iPhone 系统听写。</span>`;
     showToast("未能开始录音");
     updateSaveState();
-    $("#voice-record").disabled = false;
+    $("#nav-voice").disabled = false;
   }
 }
 
@@ -417,7 +414,8 @@ async function retryCaptureTranscription() {
     if (generation !== state.voiceGeneration) return;
     state.rawTranscript = transcript;
     // Never overwrite edits typed while a request was in flight.
-    if ($("#voice-transcript").value === before && !before) $("#voice-transcript").value = transcript;
+    const currentText = $("#voice-transcript").value;
+    $("#voice-transcript").value = currentText ? `${currentText}\n${transcript}` : transcript;
     state.voiceMessage = "转写完成，原始转写将单独保留";
   } catch (error) {
     if (generation === state.voiceGeneration) state.voiceMessage = error.name === "AbortError" ? "转写已停止，录音可保存后重试" : error.message;
@@ -451,6 +449,7 @@ async function retrySavedTranscription(event) {
 }
 
 function cancelCapture() {
+  if (($("#voice-transcript").value.trim() || state.pendingAudioBlob || state.recording) && !confirm("放弃这条尚未保存的记录和录音？")) return;
   state.voiceGeneration++;
   state.voiceAbort?.abort();
   clearInterval(state.recordingTimer);
@@ -464,13 +463,14 @@ function cancelCapture() {
 }
 
 function updateVoiceButton() {
-  const button = $("#voice-record");
+  const button = $("#nav-voice");
   button.disabled = state.voiceBusy || state.voiceStarting;
   $("#voice-retry").hidden = !state.pendingAudioBlob || !!state.rawTranscript;
   $("#voice-retry").disabled = state.voiceBusy || state.recording;
   button.classList.toggle("recording", state.recording);
   button.setAttribute("aria-pressed", String(state.recording));
-  button.textContent = state.recording ? "停止并转写" : state.pendingAudioBlob ? "重新录音" : "开始录音";
+  button.setAttribute("aria-label", state.recording ? "停止录音并转写" : "开始语音录音");
+  $("#nav-voice-label").textContent = state.recording ? "停止录音" : "语音输入";
   if (state.voiceStarting || state.voiceBusy) {
     $("#voice-status").textContent = state.voiceStarting ? "等待麦克风权限…" : "正在转写，请稍候…";
   } else if (state.recording) {
@@ -488,7 +488,7 @@ function updateSaveState() {
   const hasText = $("#raw-text").value.trim().length > 0;
   const hasTranscript = $("#voice-transcript").value.trim().length > 0;
   $("#save-entry").disabled = state.recording || state.voiceBusy || state.voiceStarting || (state.captureMode === "text" ? !hasText : !hasTranscript && !state.pendingAudioBlob);
-  $("#save-entry").textContent = state.captureMode === "voice" && state.pendingAudioBlob && !hasTranscript ? "保存为待转写" : "保存记录";
+  $("#save-entry").setAttribute("aria-label", state.pendingAudioBlob && !state.rawTranscript ? "保存为待转写" : "保存记录");
   $("#char-count").textContent = $("#raw-text").value.length;
 }
 
@@ -816,11 +816,8 @@ function initializeSelects() {
 
 function bindEvents() {
   $$('[data-go]').forEach(button => button.addEventListener("click", () => go(button.dataset.go)));
-  $("#nav-voice").addEventListener("click", () => go("capture", { mode: "voice" }));
+  $("#nav-voice").addEventListener("click", () => { go("capture", { mode: "voice" }); state.recording ? stopRecording() : startRecording(); });
   $("#cancel-capture").addEventListener("click", cancelCapture);
-  $("#text-mode").addEventListener("click", () => setCaptureMode("text"));
-  $("#voice-mode").addEventListener("click", () => setCaptureMode("voice"));
-  $("#voice-record").addEventListener("click", () => state.recording ? stopRecording() : startRecording());
   $("#voice-retry").addEventListener("click", retryCaptureTranscription);
   $("#raw-text").addEventListener("input", updateSaveState);
   $("#voice-transcript").addEventListener("input", updateSaveState);
