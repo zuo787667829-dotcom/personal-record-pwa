@@ -47,6 +47,7 @@
     .topbar h1 { margin: 0; font-size: 1.08rem; letter-spacing: -.01em; }
     .topbar .eyebrow { margin: 0; font-size: .78rem; color: var(--muted); }
     .back { border: 0; background: transparent; min-width: 44px; min-height: 44px; font-size: 1.25rem; }
+    .text-action { min-width: 52px; min-height: 44px; padding: 0; border: 0; background: transparent; color: var(--accent); font-weight: 600; }
     main, .content { padding: 20px 16px 28px; }
     h2 { margin: 0 0 12px; font-size: 1.05rem; }
     p { margin: 0; }
@@ -88,6 +89,9 @@
     .nav-btn { min-height: 52px; border: 0; background: transparent; color: var(--muted); font-size: .82rem; }
     .nav-btn span { display: block; font-size: 1.15rem; line-height: 1.1; }
     .nav-btn.active { color: var(--accent); font-weight: 700; }
+    .bottom-nav.flow-hidden { display: none; }
+    .prototype-shell.focus-flow .sticky-action { bottom: 0; padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
+    .prototype-shell.focus-flow .screen.active { padding-bottom: 72px; }
     .mode-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; padding: 3px; border-radius: 10px; background: #e3e3e8; }
     .mode-tab { min-height: 36px; border: 0; border-radius: 8px; background: transparent; font-size: .9rem; }
     .mode-tab.active { background: white; box-shadow: 0 1px 5px rgba(0,0,0,.08); font-weight: 700; }
@@ -175,6 +179,13 @@
     .recorder-options { margin-top: 12px; padding: 0 14px 14px; border-radius: var(--radius); background: var(--paper); text-align: center; }
     .recorder-options > summary { min-height: 48px; display: flex; align-items: center; justify-content: space-between; color: var(--accent); cursor: pointer; }
     .recorder-options > summary::-webkit-details-marker { display: none; }
+    .voice-session { padding: 24px 14px 18px; border-radius: var(--radius); background: var(--paper); text-align: center; }
+    .transcript-editor { margin-top: 12px; padding: 14px; border-radius: var(--radius); background: var(--paper); }
+    .transcript-editor .row-title { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 8px; }
+    .transcript-editor textarea { min-height: 160px; border: 0; background: var(--soft); }
+    .capture-title-card { margin-top: 12px; padding: 13px 14px; border-radius: var(--radius); background: var(--paper); }
+    .capture-title-card .row-title { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 8px; }
+    .capture-title-card input { border: 0; background: var(--soft); }
     .toast {
       position: fixed; z-index: 50; bottom: 88px; left: 50%; transform: translate(-50%, 16px); width: min(calc(100% - 32px), 390px);
       padding: 12px 14px; border-radius: 10px; background: var(--ink); color: white; opacity: 0; pointer-events: none; transition: .2s;
@@ -202,7 +213,7 @@
         <h2>现在想记什么？</h2>
         <div class="quick-grid">
           <button class="quick-action primary" type="button" id="home-voice-entry">
-            <span class="icon" aria-hidden="true">●</span><strong>语音输入</strong><span>使用系统听写</span>
+            <span class="icon" aria-hidden="true">●</span><strong>语音记录</strong><span>点击开始说话</span>
           </button>
           <button class="quick-action" type="button" id="home-text-entry">
             <span class="icon" aria-hidden="true">✎</span><strong>文字记录</strong><span>直接输入文字</span>
@@ -223,9 +234,9 @@
 
     <section class="screen" id="screen-capture" data-screen="capture" aria-labelledby="capture-title">
       <header class="topbar">
-        <button class="back" type="button" data-go="home" aria-label="返回首页">‹</button>
+        <button class="text-action" type="button" id="cancel-capture">取消</button>
         <h1 id="capture-title">快速记录</h1>
-        <span class="tiny">只需正文</span>
+        <span class="tiny" id="capture-mode-note">只需正文</span>
       </header>
       <div class="content">
         <div class="mode-tabs" role="tablist" aria-label="输入方式">
@@ -242,18 +253,15 @@
         </div>
 
         <div class="voice-panel" id="voice-panel">
-          <div class="dictation-card" id="transcript-wrap">
-            <strong>用 iPhone 系统听写</strong>
-            <p class="muted">点输入框，再点键盘上的麦克风。文字会直接进入原始转写。</p>
-            <label class="sr-only" for="voice-transcript">原始转写文本</label>
-            <textarea id="voice-transcript" maxlength="4000" placeholder="点这里，然后使用键盘麦克风说话……"></textarea>
-            <p class="input-note">保存后原始转写不会被整理内容覆盖。</p>
-          </div>
-          <details class="recorder-options">
-            <summary>只录音，稍后由 AI 转写 <span aria-hidden="true">⌄</span></summary>
+          <div class="voice-session">
             <button class="voice-button" id="voice-record" type="button" aria-pressed="false">开始录音</button>
-            <div class="voice-status" id="voice-status"><strong>自动转写尚未配置</strong><br><span class="tiny">录音可先保存在本机，之后再重试。</span></div>
-          </details>
+            <div class="voice-status" id="voice-status"><strong>自动转写尚未配置</strong><br><span class="tiny">当前可先录音并保存为待转写。</span></div>
+          </div>
+          <div class="transcript-editor" id="transcript-wrap">
+            <div class="row-title"><label for="voice-transcript" style="margin:0">转写文字</label><span class="tiny">可以编辑</span></div>
+            <textarea id="voice-transcript" maxlength="4000" placeholder="停止录音后，转写文字会显示在这里……"></textarea>
+            <p class="input-note">API 接入前，也可以点输入框使用 iPhone 键盘听写。保存后原始转写不会被覆盖。</p>
+          </div>
         </div>
 
         <div class="capture-meta" aria-label="记录信息">
@@ -278,6 +286,12 @@
             </div>
             <button class="chip" id="manage-tags" type="button" style="margin-top:8px">管理全部标签</button>
           </details>
+        </section>
+
+        <section class="capture-title-card" aria-labelledby="capture-entry-title-label">
+          <div class="row-title"><label id="capture-entry-title-label" for="capture-entry-title" style="margin:0">标题</label><span class="tiny">可选</span></div>
+          <input id="capture-entry-title" maxlength="80" placeholder="例如：工作随记">
+          <p class="input-note" id="capture-title-preview">保存后自动添加日期后缀</p>
         </section>
 
       </div>

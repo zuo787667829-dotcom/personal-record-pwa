@@ -21,7 +21,8 @@ const state = {
   recorder: null,
   mediaStream: null,
   audioChunks: [],
-  pendingAudioBlob: null
+  pendingAudioBlob: null,
+  discardRecording: false
 };
 
 const $ = selector => document.querySelector(selector);
@@ -61,6 +62,23 @@ function formatDay(value) {
 function monthKey(value) {
   const date = new Date(value);
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function captureDateSuffix() {
+  const localDate = $("#capture-time").value.slice(0, 10) || isoLocal(new Date()).slice(0, 10);
+  return localDate.replaceAll("-", "");
+}
+
+function generatedCaptureTitle() {
+  const suffix = captureDateSuffix();
+  const typed = $("#capture-entry-title").value.trim();
+  const categoryName = findCategory(state.captureCategoryId)?.name;
+  const base = typed || (categoryName ? `${categoryName}随记` : "随记");
+  return base.endsWith(`_${suffix}`) ? base : `${base}_${suffix}`;
+}
+
+function updateCaptureTitlePreview() {
+  $("#capture-title-preview").textContent = `保存为：${generatedCaptureTitle()}`;
 }
 
 function summary(entry) {
@@ -193,6 +211,9 @@ function bindRecordCards(root) {
 function go(screen, options = {}) {
   $$(".screen").forEach(element => element.classList.toggle("active", element.dataset.screen === screen));
   $$(".nav-btn").forEach(button => button.classList.toggle("active", button.dataset.go === screen));
+  const focusFlow = screen === "capture" || screen === "detail";
+  $(".prototype-shell").classList.toggle("focus-flow", focusFlow);
+  $(".bottom-nav").classList.toggle("flow-hidden", focusFlow);
   if (screen === "capture") prepareCapture(options.mode || "text", options.autoRecord || false);
   if (screen === "home") renderHome();
   if (screen === "timeline") renderTimeline();
@@ -225,6 +246,7 @@ function resetCapture() {
   $("#transcript-wrap").hidden = false;
   $("#new-tag-name").value = "";
   $("#new-project-name").value = "";
+  $("#capture-entry-title").value = "";
   state.captureCategoryId = "";
   state.captureTagIds = [];
   state.pendingAudioBlob = null;
@@ -232,6 +254,7 @@ function resetCapture() {
   $("#capture-time").value = isoLocal(new Date());
   updateVoiceButton();
   renderCapturePickers();
+  updateCaptureTitlePreview();
   updateSaveState();
 }
 
@@ -244,6 +267,8 @@ function prepareCapture(mode, autoRecord) {
 
 function setCaptureMode(mode) {
   state.captureMode = mode;
+  $("#capture-title").textContent = mode === "voice" ? "语音记录" : "文字记录";
+  $("#capture-mode-note").textContent = mode === "voice" ? "停止后可编辑" : "只需正文";
   $("#text-mode").classList.toggle("active", mode === "text");
   $("#voice-mode").classList.toggle("active", mode === "voice");
   $("#text-mode").setAttribute("aria-selected", String(mode === "text"));
@@ -265,6 +290,7 @@ function renderCapturePickers() {
     renderCapturePickers();
   });
   $("#capture-work-options").hidden = !isWorkCategory(state.captureCategoryId);
+  updateCaptureTitlePreview();
 }
 
 function isWorkCategory(categoryId) {
@@ -280,14 +306,16 @@ async function startRecording() {
     return;
   }
   try {
+    state.discardRecording = false;
     state.mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
     state.audioChunks = [];
     state.recorder = new MediaRecorder(state.mediaStream);
     state.recorder.addEventListener("dataavailable", event => { if (event.data.size) state.audioChunks.push(event.data); });
     state.recorder.addEventListener("stop", () => {
-      state.pendingAudioBlob = new Blob(state.audioChunks, { type: state.recorder.mimeType || "audio/webm" });
+      state.pendingAudioBlob = state.discardRecording ? null : new Blob(state.audioChunks, { type: state.recorder.mimeType || "audio/webm" });
       state.mediaStream?.getTracks().forEach(track => track.stop());
       state.recording = false;
+      state.discardRecording = false;
       $("#transcript-wrap").hidden = false;
       updateVoiceButton();
       updateSaveState();
@@ -307,15 +335,23 @@ function stopRecording() {
   if (state.recorder?.state === "recording") state.recorder.stop();
 }
 
+function cancelCapture() {
+  state.discardRecording = true;
+  if (state.recorder?.state === "recording") state.recorder.stop();
+  state.mediaStream?.getTracks().forEach(track => track.stop());
+  state.pendingAudioBlob = null;
+  go("home");
+}
+
 function updateVoiceButton() {
   const button = $("#voice-record");
   button.classList.toggle("recording", state.recording);
   button.setAttribute("aria-pressed", String(state.recording));
-  button.textContent = state.recording ? "结束录音" : "开始录音";
+  button.textContent = state.recording ? "停止并转写" : state.pendingAudioBlob ? "重新录音" : "开始录音";
   if (state.recording) {
     $("#voice-status").innerHTML = `<strong>正在录音…</strong><br><span class="tiny">说完后点击“结束录音”</span>`;
   } else if (state.pendingAudioBlob) {
-    $("#voice-status").innerHTML = `<strong>录音已保存在本机</strong><br><span class="tiny">云端转写未配置；可以先保存为待转写。</span>`;
+    $("#voice-status").innerHTML = `<strong>录音完成，等待 AI 转写</strong><br><span class="tiny">服务尚未配置；现在可保存为待转写。</span>`;
   } else {
     $("#voice-status").innerHTML = `<strong>自动转写尚未配置</strong><br><span class="tiny">录音只在本机临时保存，接入 AI 后可自动转写。</span>`;
   }
@@ -325,6 +361,7 @@ function updateSaveState() {
   const hasText = $("#raw-text").value.trim().length > 0;
   const hasTranscript = $("#voice-transcript").value.trim().length > 0;
   $("#save-entry").disabled = state.recording || (state.captureMode === "text" ? !hasText : !hasTranscript && !state.pendingAudioBlob);
+  $("#save-entry").textContent = state.captureMode === "voice" && state.pendingAudioBlob && !hasTranscript ? "保存为待转写" : "保存记录";
   $("#char-count").textContent = $("#raw-text").value.length;
 }
 
@@ -343,7 +380,7 @@ async function saveNewEntry() {
     category_id: state.captureCategoryId || null,
     project_id: null,
     tag_ids: [...state.captureTagIds],
-    title: "",
+    title: generatedCaptureTitle(),
     source_type: state.captureMode,
     raw_text: rawText,
     raw_transcript: rawTranscript,
@@ -656,12 +693,15 @@ function initializeSelects() {
 function bindEvents() {
   $$('[data-go]').forEach(button => button.addEventListener("click", () => go(button.dataset.go)));
   $("#home-text-entry").addEventListener("click", () => go("capture", { mode: "text" }));
-  $("#home-voice-entry").addEventListener("click", () => go("capture", { mode: "voice" }));
+  $("#home-voice-entry").addEventListener("click", () => go("capture", { mode: "voice", autoRecord: true }));
+  $("#cancel-capture").addEventListener("click", cancelCapture);
   $("#text-mode").addEventListener("click", () => setCaptureMode("text"));
   $("#voice-mode").addEventListener("click", () => setCaptureMode("voice"));
   $("#voice-record").addEventListener("click", () => state.recording ? stopRecording() : startRecording());
   $("#raw-text").addEventListener("input", updateSaveState);
   $("#voice-transcript").addEventListener("input", updateSaveState);
+  $("#capture-entry-title").addEventListener("input", updateCaptureTitlePreview);
+  $("#capture-time").addEventListener("change", updateCaptureTitlePreview);
   $("#save-entry").addEventListener("click", saveNewEntry);
   $("#finish-save").addEventListener("click", () => { $("#saved-dialog").close(); go("detail"); });
   $("#continue-structure").addEventListener("click", () => { $("#saved-dialog").close(); go("detail", { openStructure: true }); });
