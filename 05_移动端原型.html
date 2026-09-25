@@ -268,12 +268,13 @@
         <div class="voice-panel" id="voice-panel">
           <div class="voice-session">
             <button class="voice-button" id="voice-record" type="button" aria-pressed="false">开始录音</button>
+            <button class="chip" id="voice-retry" type="button" hidden>重试转写</button>
             <div class="voice-status" id="voice-status"><strong>自动转写尚未配置</strong><br><span class="tiny">当前可先录音并保存为待转写。</span></div>
           </div>
           <div class="transcript-editor" id="transcript-wrap">
             <div class="row-title"><label for="voice-transcript" style="margin:0">转写文字</label><span class="tiny">可以编辑</span></div>
-            <textarea id="voice-transcript" maxlength="4000" placeholder="转写文字显示在这里，也可以点击直接输入……"></textarea>
-            <p class="input-note">API 接入前，也可以点输入框使用 iPhone 键盘听写。保存后原始转写不会被覆盖。</p>
+            <textarea id="voice-transcript" placeholder="转写文字显示在这里，也可以点击直接输入……"></textarea>
+            <p class="input-note">原始转写与编辑内容分别保存。直接键盘输入（包括系统听写）按文字记录保存。转写需联网并单独同意上传录音。</p>
           </div>
         </div>
 

@@ -1,10 +1,12 @@
-const CACHE_NAME = "shiji-shell-v17";
+const CACHE_NAME = "shiji-shell-v19";
 const APP_SHELL = [
   "./",
   "./index.html",
   "./05_移动端原型.html",
   "./app.js",
   "./core.js",
+  "./voice-client.js",
+  "./voice-config.js",
   "./manifest.webmanifest",
   "./icon.svg"
 ];
@@ -17,13 +19,15 @@ self.addEventListener("install", event => {
 self.addEventListener("activate", event => {
   event.waitUntil(
     caches.keys()
-      .then(keys => Promise.all(keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))))
+      .then(keys => Promise.all(keys.filter(key => key.startsWith("shiji-shell-") && key !== CACHE_NAME).map(key => caches.delete(key))))
       .then(() => self.clients.claim())
   );
 });
 
 self.addEventListener("fetch", event => {
   if (event.request.method !== "GET") return;
+  const url = new URL(event.request.url);
+  if (!url.href.startsWith(self.registration.scope) || event.request.headers.has("Authorization")) return;
   event.respondWith(
     caches.match(event.request).then(cached => {
       const network = fetch(event.request)

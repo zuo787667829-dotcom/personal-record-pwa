@@ -1,4 +1,6 @@
 import { buildCsv, buildExportEnvelope, calculateOvertimeMinutes, markDeleted, normalizeName, restoreDeleted } from "./core.js";
+import { transcribeAudio } from "./voice-client.js";
+import { voiceConfig } from "./voice-config.js";
 
 const DB_NAME = "shiji-pwa";
 const DB_VERSION = 1;
@@ -23,7 +25,15 @@ const state = {
   audioChunks: [],
   pendingAudioBlob: null,
   discardRecording: false,
-  capturePrepared: false
+  capturePrepared: false,
+  voiceGeneration: 0,
+  voiceBusy: false,
+  voiceStarting: false,
+  rawTranscript: null,
+  voiceMessage: "",
+  voiceAbort: null,
+  recordingTimer: null,
+  recordingStartedAt: 0
 };
 
 const $ = selector => document.querySelector(selector);
@@ -121,8 +131,9 @@ function dbRequest(storeName, mode, action) {
     const store = tx.objectStore(storeName);
     let request;
     try { request = action(store); } catch (error) { reject(error); return; }
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
+    tx.oncomplete = () => resolve(request.result);
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error || new Error("本地保存失败"));
   });
 }
 
@@ -210,6 +221,11 @@ function bindRecordCards(root) {
 }
 
 function go(screen, options = {}) {
+  if (screen !== "capture" && state.voiceStarting) {
+    state.voiceGeneration++;
+    state.voiceStarting = false;
+    updateVoiceButton(); updateSaveState();
+  }
   if (screen !== "capture" && state.recording) stopRecording();
   $$(".screen").forEach(element => element.classList.toggle("active", element.dataset.screen === screen));
   $$(".nav-btn").forEach(button => {
@@ -250,6 +266,12 @@ function renderHome() {
 }
 
 function resetCapture() {
+  state.voiceGeneration++;
+  state.voiceAbort?.abort();
+  state.voiceBusy = false;
+  state.voiceStarting = false;
+  state.rawTranscript = null;
+  state.voiceMessage = "";
   $("#raw-text").value = "";
   $("#voice-transcript").value = "";
   $("#transcript-wrap").hidden = false;
@@ -275,6 +297,8 @@ function prepareCapture(mode, autoRecord) {
 }
 
 function setCaptureMode(mode) {
+  if (mode !== "voice" && state.recording) stopRecording();
+  if (mode !== "voice" && state.voiceStarting) { state.voiceGeneration++; state.voiceStarting = false; updateVoiceButton(); }
   state.captureMode = mode;
   $("#capture-title").textContent = mode === "voice" ? "语音记录" : "文字记录";
   $("#capture-mode-note").textContent = mode === "voice" ? "停止后可编辑" : "只需正文";
@@ -308,35 +332,59 @@ function isWorkCategory(categoryId) {
 }
 
 async function startRecording() {
+  if (state.voiceStarting || state.voiceBusy || state.recording) return;
+  if ((state.pendingAudioBlob || state.rawTranscript) && !confirm("重新录音会替换当前未保存的录音和转写，是否继续？")) return;
   if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
     $("#transcript-wrap").hidden = false;
     $("#voice-status").innerHTML = `<strong>当前浏览器不支持独立录音</strong><br><span class="tiny">仍可使用上方的 iPhone 系统听写。</span>`;
     showToast("当前浏览器不支持录音");
     return;
   }
+  const generation = ++state.voiceGeneration;
+  state.voiceStarting = true;
+  updateVoiceButton(); updateSaveState();
   try {
     state.discardRecording = false;
-    state.mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    state.audioChunks = [];
-    state.recorder = new MediaRecorder(state.mediaStream);
-    state.recorder.addEventListener("dataavailable", event => { if (event.data.size) state.audioChunks.push(event.data); });
-    state.recorder.addEventListener("stop", () => {
-      state.pendingAudioBlob = state.discardRecording ? null : new Blob(state.audioChunks, { type: state.recorder.mimeType || "audio/webm" });
-      state.mediaStream?.getTracks().forEach(track => track.stop());
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    if (generation !== state.voiceGeneration) { stream.getTracks().forEach(track => track.stop()); return; }
+    state.mediaStream = stream;
+    const chunks = [];
+    const recorder = new MediaRecorder(stream);
+    state.recorder = recorder;
+    state.pendingAudioBlob = null; state.rawTranscript = null; state.voiceMessage = "";
+    $("#voice-transcript").value = "";
+    recorder.addEventListener("dataavailable", event => { if (event.data.size) chunks.push(event.data); });
+    recorder.addEventListener("stop", async () => {
+      stream.getTracks().forEach(track => track.stop());
+      if (generation !== state.voiceGeneration) return;
+      clearInterval(state.recordingTimer);
+      state.pendingAudioBlob = new Blob(chunks, { type: recorder.mimeType || "audio/webm" });
       state.recording = false;
-      state.discardRecording = false;
       $("#transcript-wrap").hidden = false;
       updateVoiceButton();
       updateSaveState();
+      await retryCaptureTranscription();
     });
-    state.recorder.start();
+    recorder.start(1000);
+    state.voiceStarting = false;
     state.recording = true;
+    state.recordingStartedAt = Date.now();
+    state.recordingTimer = setInterval(() => {
+      if (Date.now() - state.recordingStartedAt >= 120000) stopRecording();
+      updateVoiceButton();
+    }, 1000);
     updateVoiceButton();
+    updateSaveState();
   } catch (error) {
+    if (generation !== state.voiceGeneration) return;
+    state.mediaStream?.getTracks().forEach(track => track.stop());
+    state.voiceStarting = false;
     state.recording = false;
     $("#transcript-wrap").hidden = false;
     $("#voice-status").innerHTML = `<strong>没有取得独立录音权限</strong><br><span class="tiny">仍可使用上方的 iPhone 系统听写。</span>`;
     showToast("未能开始录音");
+    updateSaveState();
+    $("#voice-record").disabled = false;
   }
 }
 
@@ -344,7 +392,69 @@ function stopRecording() {
   if (state.recorder?.state === "recording") state.recorder.stop();
 }
 
+function persistVoiceEntry(entry, audio) {
+  return new Promise((resolve, reject) => {
+    const tx = state.db.transaction(["entries", "audio"], "readwrite");
+    tx.objectStore("entries").put(entry);
+    if (audio) tx.objectStore("audio").put({ entry_id: entry.id, blob: audio, created_at: entry.created_at });
+    else tx.objectStore("audio").delete(entry.id);
+    tx.oncomplete = resolve;
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error || new Error("保存失败"));
+  });
+}
+
+async function retryCaptureTranscription() {
+  if (!state.pendingAudioBlob?.size || state.voiceBusy || state.rawTranscript) return;
+  const generation = state.voiceGeneration;
+  const before = $("#voice-transcript").value;
+  state.voiceBusy = true;
+  const controller = new AbortController(); state.voiceAbort = controller;
+  const timeout = setTimeout(() => controller.abort(), 55000);
+  updateVoiceButton(); updateSaveState();
+  try {
+    const transcript = await transcribeAudio(state.pendingAudioBlob, controller.signal);
+    if (generation !== state.voiceGeneration) return;
+    state.rawTranscript = transcript;
+    // Never overwrite edits typed while a request was in flight.
+    if ($("#voice-transcript").value === before && !before) $("#voice-transcript").value = transcript;
+    state.voiceMessage = "转写完成，原始转写将单独保留";
+  } catch (error) {
+    if (generation === state.voiceGeneration) state.voiceMessage = error.name === "AbortError" ? "转写已停止，录音可保存后重试" : error.message;
+  } finally {
+    clearTimeout(timeout);
+    if (generation === state.voiceGeneration) { state.voiceBusy = false; updateVoiceButton(); updateSaveState(); }
+  }
+}
+
+async function retrySavedTranscription(event) {
+  const entry = detailEntry();
+  if (!entry || entry.raw_transcript || state.voiceBusy) return;
+  const button = event.currentTarget; button.disabled = true;
+  state.voiceBusy = true;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 55000);
+  try {
+    const audio = await dbRequest("audio", "readonly", store => store.get(entry.id));
+    if (!audio?.blob) throw new Error("本机没有这条记录的录音，无法重试");
+    const transcript = await transcribeAudio(audio.blob, controller.signal);
+    const latest = await dbRequest("entries", "readonly", store => store.get(entry.id));
+    if (!latest || latest.deleted_at || latest.raw_transcript) return;
+    const updated = { ...latest, raw_transcript: transcript, transcription_status: "completed", temporary_audio_key: null, updated_at: nowIso(), sync_status: "pending" };
+    await persistVoiceEntry(updated, null);
+    await loadState();
+    // Update only raw display, preserving unsaved detail edits.
+    if (state.currentEntryId === entry.id) $("#detail-raw").textContent = transcript;
+    showToast("转写成功，原始文本已保存");
+  } catch (error) { showToast(error.name === "AbortError" ? "转写超时，录音仍保留" : error.message); }
+  finally { clearTimeout(timeout); button.disabled = false; state.voiceBusy = false; updateVoiceButton(); updateSaveState(); }
+}
+
 function cancelCapture() {
+  state.voiceGeneration++;
+  state.voiceAbort?.abort();
+  clearInterval(state.recordingTimer);
+  state.voiceStarting = false; state.voiceBusy = false; state.recording = false;
   state.capturePrepared = false;
   state.discardRecording = true;
   if (state.recorder?.state === "recording") state.recorder.stop();
@@ -355,30 +465,40 @@ function cancelCapture() {
 
 function updateVoiceButton() {
   const button = $("#voice-record");
+  button.disabled = state.voiceBusy || state.voiceStarting;
+  $("#voice-retry").hidden = !state.pendingAudioBlob || !!state.rawTranscript;
+  $("#voice-retry").disabled = state.voiceBusy || state.recording;
   button.classList.toggle("recording", state.recording);
   button.setAttribute("aria-pressed", String(state.recording));
   button.textContent = state.recording ? "停止并转写" : state.pendingAudioBlob ? "重新录音" : "开始录音";
-  if (state.recording) {
-    $("#voice-status").innerHTML = `<strong>正在录音…</strong><br><span class="tiny">说完后点击“结束录音”</span>`;
+  if (state.voiceStarting || state.voiceBusy) {
+    $("#voice-status").textContent = state.voiceStarting ? "等待麦克风权限…" : "正在转写，请稍候…";
+  } else if (state.recording) {
+    $("#voice-status").textContent = `正在录音 ${Math.floor((Date.now() - state.recordingStartedAt) / 1000)} 秒 · 最长两分钟`;
+  } else if (state.voiceMessage || state.rawTranscript) {
+    $("#voice-status").textContent = state.voiceMessage || "转写完成，可编辑后保存";
   } else if (state.pendingAudioBlob) {
-    $("#voice-status").innerHTML = `<strong>录音完成，等待 AI 转写</strong><br><span class="tiny">服务尚未配置；现在可保存为待转写。</span>`;
+    $("#voice-status").textContent = "录音已就绪，可转写或保存为待转写";
   } else {
-    $("#voice-status").innerHTML = `<strong>自动转写尚未配置</strong><br><span class="tiny">录音只在本机临时保存，接入 AI 后可自动转写。</span>`;
+    $("#voice-status").textContent = voiceConfig.endpoint ? "点击开始录音，停止后确认上传转写" : "自动转写尚未配置；可录音并保存为待转写";
   }
 }
 
 function updateSaveState() {
   const hasText = $("#raw-text").value.trim().length > 0;
   const hasTranscript = $("#voice-transcript").value.trim().length > 0;
-  $("#save-entry").disabled = state.recording || (state.captureMode === "text" ? !hasText : !hasTranscript && !state.pendingAudioBlob);
+  $("#save-entry").disabled = state.recording || state.voiceBusy || state.voiceStarting || (state.captureMode === "text" ? !hasText : !hasTranscript && !state.pendingAudioBlob);
   $("#save-entry").textContent = state.captureMode === "voice" && state.pendingAudioBlob && !hasTranscript ? "保存为待转写" : "保存记录";
   $("#char-count").textContent = $("#raw-text").value.length;
 }
 
 async function saveNewEntry() {
+  if ($("#save-entry").disabled) return;
+  $("#save-entry").disabled = true;
   const createdAt = nowIso();
-  const rawText = state.captureMode === "text" ? $("#raw-text").value.trim() : null;
-  const rawTranscript = state.captureMode === "voice" ? $("#voice-transcript").value.trim() || null : null;
+  const manualOnly = state.captureMode === "voice" && !state.rawTranscript && !state.pendingAudioBlob;
+  const rawText = state.captureMode === "text" ? $("#raw-text").value.trim() : manualOnly ? $("#voice-transcript").value.trim() : null;
+  const rawTranscript = state.captureMode === "voice" ? state.rawTranscript : null;
   const id = newId();
   const entry = {
     id,
@@ -391,11 +511,11 @@ async function saveNewEntry() {
     project_id: null,
     tag_ids: [...state.captureTagIds],
     title: generatedCaptureTitle(),
-    source_type: state.captureMode,
+    source_type: manualOnly ? "text" : state.captureMode,
     raw_text: rawText,
     raw_transcript: rawTranscript,
-    edited_text: "",
-    transcription_status: state.captureMode === "text" ? "not_applicable" : rawTranscript ? "completed" : "pending",
+    edited_text: state.captureMode === "voice" ? $("#voice-transcript").value : "",
+    transcription_status: state.captureMode === "text" || manualOnly ? "not_applicable" : rawTranscript ? "completed" : "pending",
     temporary_audio_key: state.captureMode === "voice" && !rawTranscript && state.pendingAudioBlob ? id : null,
     planned_end_at: null,
     actual_end_at: null,
@@ -415,8 +535,10 @@ async function saveNewEntry() {
     server_version: null,
     conflict_group_id: null
   };
-  await dbPut("entries", entry);
-  if (entry.temporary_audio_key && state.pendingAudioBlob) await dbPut("audio", { entry_id: id, blob: state.pendingAudioBlob, created_at: createdAt });
+  try {
+    await persistVoiceEntry(entry, entry.temporary_audio_key ? state.pendingAudioBlob : null);
+  } catch { showToast("保存失败，录音仍保留，请重试或检查存储空间"); updateSaveState(); return; }
+  state.pendingAudioBlob = null;
   await loadState();
   state.currentEntryId = id;
   state.capturePrepared = false;
@@ -436,7 +558,7 @@ function renderDetail(openStructure = false) {
   const raw = rawContent(entry);
   if (raw) $("#detail-raw").textContent = raw;
   else $("#detail-raw").innerHTML = `<strong>待转写</strong><br><span class="tiny">临时音频保存在本机。云端转写服务配置后可重试。</span><br><button class="chip" type="button" id="retry-transcription" style="margin-top:10px">重新尝试转写</button>`;
-  $("#retry-transcription")?.addEventListener("click", () => showToast("转写服务尚未配置，音频仍安全保存在本机"));
+  $("#retry-transcription")?.addEventListener("click", retrySavedTranscription);
   $("#detail-edited").value = entry.edited_text || "";
   $("#detail-title-input").value = entry.title || "";
   $("#detail-category").innerHTML = optionMarkup(state.categories, "未分类", entry.category_id);
@@ -699,6 +821,7 @@ function bindEvents() {
   $("#text-mode").addEventListener("click", () => setCaptureMode("text"));
   $("#voice-mode").addEventListener("click", () => setCaptureMode("voice"));
   $("#voice-record").addEventListener("click", () => state.recording ? stopRecording() : startRecording());
+  $("#voice-retry").addEventListener("click", retryCaptureTranscription);
   $("#raw-text").addEventListener("input", updateSaveState);
   $("#voice-transcript").addEventListener("input", updateSaveState);
   $("#voice-transcript").addEventListener("focus", () => { if (state.recording) stopRecording(); });
