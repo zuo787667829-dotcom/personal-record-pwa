@@ -230,8 +230,6 @@ function resetCapture() {
   state.pendingAudioBlob = null;
   state.recording = false;
   $("#capture-time").value = isoLocal(new Date());
-  $("#capture-options").open = false;
-  $("#capture-project").value = "";
   updateVoiceButton();
   renderCapturePickers();
   updateSaveState();
@@ -343,7 +341,7 @@ async function saveNewEntry() {
     timezone: timezone(),
     timezone_offset_minutes: -new Date().getTimezoneOffset(),
     category_id: state.captureCategoryId || null,
-    project_id: $("#capture-project").value || null,
+    project_id: null,
     tag_ids: [...state.captureTagIds],
     title: "",
     source_type: state.captureMode,
@@ -547,7 +545,7 @@ async function createProjectFromInput() {
   await dbPut("projects", project);
   await loadState();
   initializeSelects();
-  $("#capture-project").value = project.id;
+  $("#detail-project").value = project.id;
   $("#new-project-name").value = "";
   showToast("项目 / 主题已创建");
 }
@@ -647,9 +645,6 @@ function exportMarkdown() {
 }
 
 function initializeSelects() {
-  const captureProjectValue = $("#capture-project").value;
-  $("#capture-project").innerHTML = optionMarkup(state.projects, "不选择项目 / 主题", captureProjectValue);
-  if (state.projects.some(project => project.id === captureProjectValue)) $("#capture-project").value = captureProjectValue;
   $("#timeline-category").innerHTML = optionMarkup(state.categories, "全部分类");
   $("#search-category").innerHTML = optionMarkup(state.categories, "全部分类");
   $("#timeline-tag").innerHTML = `<option value="">全部标签</option>${state.tags.map(tag => `<option value="${tag.id}">${escapeHtml(tag.name)}${tag.is_active ? "" : "（停用）"}</option>`).join("")}`;

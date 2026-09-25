@@ -201,11 +201,11 @@
       <main>
         <h2>现在想记什么？</h2>
         <div class="quick-grid">
-          <button class="quick-action primary" type="button" id="home-text-entry">
-            <span class="icon" aria-hidden="true">✎</span><strong>快速记录</strong><span>直接输入文字</span>
-          </button>
-          <button class="quick-action" type="button" id="home-voice-entry">
+          <button class="quick-action primary" type="button" id="home-voice-entry">
             <span class="icon" aria-hidden="true">●</span><strong>语音输入</strong><span>使用系统听写</span>
+          </button>
+          <button class="quick-action" type="button" id="home-text-entry">
+            <span class="icon" aria-hidden="true">✎</span><strong>文字记录</strong><span>直接输入文字</span>
           </button>
         </div>
 
@@ -280,17 +280,6 @@
           </details>
         </section>
 
-        <details class="options" id="capture-options">
-          <summary>更多 <span class="tiny">项目 / 主题</span></summary>
-          <div class="field" style="padding-bottom:14px">
-            <label for="capture-project">项目 / 主题</label>
-            <select id="capture-project"><option value="">不选择项目</option></select>
-            <div class="inline-create" style="margin-top:10px">
-              <input id="new-project-name" placeholder="新建项目 / 主题" maxlength="60">
-              <button class="btn secondary" id="create-project" type="button">添加</button>
-            </div>
-          </div>
-        </details>
       </div>
       <div class="sticky-action"><button class="btn primary" id="save-entry" type="button" disabled>保存记录</button></div>
     </section>
@@ -317,7 +306,14 @@
           <div class="field"><label for="detail-title-input">标题（可选）</label><input id="detail-title-input" placeholder="不填时显示正文摘要"></div>
           <div class="field"><label for="detail-category">一级分类</label><select id="detail-category"></select></div>
           <div class="field"><label>标签（可多选）</label><div class="chips" id="detail-tags"></div></div>
-          <div class="field"><label for="detail-project">项目 / 主题</label><select id="detail-project"></select></div>
+          <div class="field">
+            <label for="detail-project">项目 / 主题（可选）</label>
+            <select id="detail-project"></select>
+            <div class="inline-create" style="margin-top:10px">
+              <input id="new-project-name" placeholder="需要时新建项目 / 主题" maxlength="60">
+              <button class="btn secondary" id="create-project" type="button">添加</button>
+            </div>
+          </div>
           <div class="field"><label for="detail-occurred">发生时间</label><input id="detail-occurred" type="datetime-local"></div>
         </section>
         <details class="options" id="structure-options">
