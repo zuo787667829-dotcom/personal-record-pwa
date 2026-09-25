@@ -222,7 +222,7 @@ function renderHome() {
 function resetCapture() {
   $("#raw-text").value = "";
   $("#voice-transcript").value = "";
-  $("#transcript-wrap").hidden = true;
+  $("#transcript-wrap").hidden = false;
   $("#new-tag-name").value = "";
   $("#new-project-name").value = "";
   state.captureCategoryId = "";
@@ -259,18 +259,25 @@ function setCaptureMode(mode) {
 function renderCapturePickers() {
   renderPicker($("#capture-categories"), state.categories.filter(item => item.is_active), state.captureCategoryId ? [state.captureCategoryId] : [], id => {
     state.captureCategoryId = state.captureCategoryId === id ? "" : id;
+    if (!isWorkCategory(state.captureCategoryId)) state.captureTagIds = [];
     renderCapturePickers();
   });
   renderPicker($("#capture-tags"), state.tags.filter(item => item.is_active), state.captureTagIds, id => {
     state.captureTagIds = state.captureTagIds.includes(id) ? state.captureTagIds.filter(value => value !== id) : [...state.captureTagIds, id];
     renderCapturePickers();
   });
+  $("#capture-work-options").hidden = !isWorkCategory(state.captureCategoryId);
+}
+
+function isWorkCategory(categoryId) {
+  const category = findCategory(categoryId);
+  return category?.name === "工作" || category?.id === "category-1";
 }
 
 async function startRecording() {
   if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
     $("#transcript-wrap").hidden = false;
-    $("#voice-status").innerHTML = `<strong>当前浏览器不支持录音</strong><br><span class="tiny">可以手动填写原始转写后保存。</span>`;
+    $("#voice-status").innerHTML = `<strong>当前浏览器不支持独立录音</strong><br><span class="tiny">仍可使用上方的 iPhone 系统听写。</span>`;
     showToast("当前浏览器不支持录音");
     return;
   }
@@ -293,7 +300,7 @@ async function startRecording() {
   } catch (error) {
     state.recording = false;
     $("#transcript-wrap").hidden = false;
-    $("#voice-status").innerHTML = `<strong>没有取得麦克风权限</strong><br><span class="tiny">你仍可手动填写原始转写。</span>`;
+    $("#voice-status").innerHTML = `<strong>没有取得独立录音权限</strong><br><span class="tiny">仍可使用上方的 iPhone 系统听写。</span>`;
     showToast("未能开始录音");
   }
 }
@@ -312,7 +319,7 @@ function updateVoiceButton() {
   } else if (state.pendingAudioBlob) {
     $("#voice-status").innerHTML = `<strong>录音已保存在本机</strong><br><span class="tiny">云端转写未配置；可以先保存为待转写。</span>`;
   } else {
-    $("#voice-status").innerHTML = `<strong>准备录音</strong><br><span class="tiny">录音只在本机临时保存，转写成功后应删除。</span>`;
+    $("#voice-status").innerHTML = `<strong>自动转写尚未配置</strong><br><span class="tiny">录音只在本机临时保存，接入 AI 后可自动转写。</span>`;
   }
 }
 
@@ -654,7 +661,7 @@ function initializeSelects() {
 function bindEvents() {
   $$('[data-go]').forEach(button => button.addEventListener("click", () => go(button.dataset.go)));
   $("#home-text-entry").addEventListener("click", () => go("capture", { mode: "text" }));
-  $("#home-voice-entry").addEventListener("click", () => go("capture", { mode: "voice", autoRecord: true }));
+  $("#home-voice-entry").addEventListener("click", () => go("capture", { mode: "voice" }));
   $("#text-mode").addEventListener("click", () => setCaptureMode("text"));
   $("#voice-mode").addEventListener("click", () => setCaptureMode("voice"));
   $("#voice-record").addEventListener("click", () => state.recording ? stopRecording() : startRecording());
