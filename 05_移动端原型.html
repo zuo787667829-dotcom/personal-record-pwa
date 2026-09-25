@@ -98,11 +98,12 @@
       width: min(100%, 430px); padding: 7px 12px calc(7px + env(safe-area-inset-bottom));
       display: grid; grid-template-columns: repeat(3, 1fr); border-top: .5px solid var(--line); background: rgba(249,249,251,.88); backdrop-filter: saturate(180%) blur(18px);
     }
-    .nav-btn { min-height: 52px; border: 0; background: transparent; color: var(--muted); font-size: .82rem; }
-    .nav-btn span { display: block; font-size: 1.15rem; line-height: 1.1; }
-    .nav-btn.active { color: var(--accent); font-weight: 700; }
-    .voice-nav { color: var(--accent); font-weight: 600; }
-    .voice-nav span { width: 46px; height: 30px; margin: 0 auto 3px; border-radius: 15px; display: grid; place-items: center; background: var(--accent); color: white; }
+    .bottom-nav { background: #eef0f2; backdrop-filter: none; }
+    .nav-btn { min-height: 56px; border: 0; background: transparent; color: #666b70; font-size: .82rem; }
+    .nav-btn span { width: 64px; height: 30px; margin: 0 auto 3px; border-radius: 18px; display: grid; place-items: center; background: transparent; }
+    .nav-btn svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+    .nav-btn.active { color: #263b3b; font-weight: 650; }
+    .nav-btn.active span { background: #d0dfdd; }
     #screen-timeline { padding-bottom: calc(160px + env(safe-area-inset-bottom)); }
     .timeline-search { position: fixed; z-index: 19; left: 50%; transform: translateX(-50%); bottom: calc(76px + env(safe-area-inset-bottom)); width: min(calc(100% - 32px), 398px); padding: 8px; border-radius: 18px; background: rgba(242,242,247,.97); box-shadow: 0 2px 12px rgba(0,0,0,.06); }
     .timeline-search input { padding-right: 44px; }
@@ -393,9 +394,9 @@
     </section>
 
     <nav class="bottom-nav" aria-label="主要导航">
-      <button class="nav-btn active" data-go="home" type="button"><span aria-hidden="true">⌂</span>首页</button>
-      <button class="nav-btn voice-nav" id="nav-voice" type="button"><span aria-hidden="true">●</span>语音输入</button>
-      <button class="nav-btn" data-go="timeline" type="button"><span aria-hidden="true">☷</span>时间轴</button>
+      <button class="nav-btn" data-go="home" type="button"><span aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m3 10 9-7 9 7v10H15v-7H9v7H3z"/></svg></span>首页</button>
+      <button class="nav-btn active" id="nav-voice" type="button" aria-current="page"><span aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="8" y="2" width="8" height="13" rx="4"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3m-4 0h8"/></svg></span>语音输入</button>
+      <button class="nav-btn" data-go="timeline" type="button"><span aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 3v18m5-16h10M10 12h10M10 19h10"/><circle cx="5" cy="5" r="1"/><circle cx="5" cy="12" r="1"/><circle cx="5" cy="19" r="1"/></svg></span>时间轴</button>
     </nav>
   </div>
 

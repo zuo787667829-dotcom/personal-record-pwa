@@ -22,7 +22,8 @@ const state = {
   mediaStream: null,
   audioChunks: [],
   pendingAudioBlob: null,
-  discardRecording: false
+  discardRecording: false,
+  capturePrepared: false
 };
 
 const $ = selector => document.querySelector(selector);
@@ -209,12 +210,21 @@ function bindRecordCards(root) {
 }
 
 function go(screen, options = {}) {
+  if (screen !== "capture" && state.recording) stopRecording();
   $$(".screen").forEach(element => element.classList.toggle("active", element.dataset.screen === screen));
-  $$(".nav-btn").forEach(button => button.classList.toggle("active", button.dataset.go === screen));
-  const focusFlow = screen === "capture" || screen === "detail";
+  $$(".nav-btn").forEach(button => {
+    const selected = button.id === "nav-voice" ? screen === "capture" : button.dataset.go === screen;
+    button.classList.toggle("active", selected);
+    if (selected) button.setAttribute("aria-current", "page");
+    else button.removeAttribute("aria-current");
+  });
+  const focusFlow = screen === "detail";
   $(".prototype-shell").classList.toggle("focus-flow", focusFlow);
   $(".bottom-nav").classList.toggle("flow-hidden", focusFlow);
-  if (screen === "capture") prepareCapture(options.mode || "text", options.autoRecord || false);
+  if (screen === "capture" && !state.capturePrepared) {
+    prepareCapture(options.mode || "voice", options.autoRecord || false);
+    state.capturePrepared = true;
+  }
   if (screen === "home") renderHome();
   if (screen === "timeline") renderTimeline();
   if (screen === "detail") renderDetail(options.openStructure || false);
@@ -335,6 +345,7 @@ function stopRecording() {
 }
 
 function cancelCapture() {
+  state.capturePrepared = false;
   state.discardRecording = true;
   if (state.recorder?.state === "recording") state.recorder.stop();
   state.mediaStream?.getTracks().forEach(track => track.stop());
@@ -408,6 +419,7 @@ async function saveNewEntry() {
   if (entry.temporary_audio_key && state.pendingAudioBlob) await dbPut("audio", { entry_id: id, blob: state.pendingAudioBlob, created_at: createdAt });
   await loadState();
   state.currentEntryId = id;
+  state.capturePrepared = false;
   setStatus();
   $("#saved-dialog").showModal();
 }
@@ -682,7 +694,7 @@ function initializeSelects() {
 
 function bindEvents() {
   $$('[data-go]').forEach(button => button.addEventListener("click", () => go(button.dataset.go)));
-  $("#nav-voice").addEventListener("click", () => go("capture", { mode: "voice", autoRecord: true }));
+  $("#nav-voice").addEventListener("click", () => go("capture", { mode: "voice" }));
   $("#cancel-capture").addEventListener("click", cancelCapture);
   $("#text-mode").addEventListener("click", () => setCaptureMode("text"));
   $("#voice-mode").addEventListener("click", () => setCaptureMode("voice"));
@@ -734,6 +746,7 @@ async function initialize() {
     bindEvents();
     renderCapturePickers();
     renderHome();
+    go("capture", { mode: "voice" });
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js").catch(() => showToast("离线应用外壳注册失败"));
   } catch (error) {
     console.error(error);
